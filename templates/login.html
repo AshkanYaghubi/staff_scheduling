@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Lamiz Workforce | Iran Network</title>
+
+    <!-- Google Fonts + Basic Reset -->
+    
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        :root {
+            --bg: #07090d;
+            --card: rgba(15, 18, 24, 0.72);
+            --border: rgba(255,255,255,0.08);
+            --gold: #d6a85f;
+            --gold-soft: #f1d4a4;
+            --text: #f5f7fa;
+            --muted: #98a2b3;
+            --glow-intensity: 0.6;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100dvh;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* ===== AMBIENT MESH + DYNAMIC NOISE ===== */
+        .ambient-bg {
+            position: fixed;
+            inset: 0;
+            overflow: hidden;
+            z-index: -2;
+            background: radial-gradient(circle at 20% 20%, rgba(214,168,95,0.12), transparent 30%),
+                        radial-gradient(circle at 80% 30%, rgba(214,168,95,0.08), transparent 35%),
+                        radial-gradient(circle at 50% 80%, rgba(255,255,255,0.04), transparent 30%),
+                        #07090d;
+        }
+
+        .ambient-bg::before,
+        .ambient-bg::after {
+            content: '';
+            position: absolute;
+            width: 60vw;
+            height: 60vw;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(214,168,95,0.08), transparent 70%);
+            filter: blur(40px);
+            animation: drift 18s infinite alternate ease-in-out;
+        }
+
+        .ambient-bg::before {
+            top: -10%;
+            left: -10%;
+        }
+
+        .ambient-bg::after {
+            bottom: -20%;
+            right: -10%;
+            animation-duration: 24s;
+        }
+
+        @keyframes drift {
+            from { transform: translate3d(0,0,0) scale(1); }
+            to { transform: translate3d(40px,-30px,0) scale(1.12); }
+        }
+
+        .noise {
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            opacity: 0.04;
+            background-image: radial-gradient(#fff 0.8px, transparent 0.8px);
+            background-size: 8px 8px;
+            pointer-events: none;
+        }
+
+        /* ===== IRAN MAP + GLOWING BRANCHES ===== */
+        .iran-network {
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0.85;
+            pointer-events: none;
+        }
+
+        .iran-map {
+            width: min(95vw, 1200px);
+            height: 95vh;
+            filter: drop-shadow(0 0 40px rgba(214,168,95,0.12));
+            transition: filter 0.3s ease;
+        }
+
+        /* Highly accurate Iran shape */
+        .iran-shape {
+            fill: rgba(255, 255, 255, 0.02);
+            stroke: rgba(214,168,95,0.35);
+            stroke-width: 1.2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            filter: drop-shadow(0 0 8px rgba(214,168,95,0.2));
+        }
+
+        /* Islands */
+        .iran-island {
+            fill: rgba(214,168,95,0.1);
+            stroke: rgba(214,168,95,0.4);
+            stroke-width: 1;
+        }
+
+        /* GLOWING NODE */
+        .branch-node {
+            fill: #efc27d;
+            filter: drop-shadow(0 0 6px rgba(214,168,95,0.9));
+            transition: all 0.3s ease;
+        }
+
+        .branch-node.active-popup {
+            fill: #ffffff;
+            r: 5.5;
+            filter: drop-shadow(0 0 15px #fff) drop-shadow(0 0 25px var(--gold));
+        }
+
+        /* Connection lines with subtle gold glow */
+        .branch-line {
+            stroke: rgba(214,168,95,0.25);
+            stroke-width: 0.8;
+            stroke-linecap: round;
+            transition: stroke-width 0.2s;
+        }
+
+        .flow-particle {
+            fill: #ffdfa5;
+            filter: drop-shadow(0 0 6px #d6a85f);
+            opacity: 0.85;
+        }
+
+        /* ===== MAP POPUP TOOLTIP ===== */
+        .map-popup {
+            position: absolute;
+            background: rgba(12, 14, 19, 0.85);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(214,168,95,0.4);
+            padding: 10px 16px;
+            border-radius: 8px;
+            color: #fff;
+            pointer-events: none;
+            opacity: 0;
+            transform: translate(-50%, 15px) scale(0.95);
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5), inset 0 0 12px rgba(214,168,95,0.1);
+            z-index: 1000;
+            white-space: nowrap;
+            text-align: center;
+        }
+
+        .map-popup.active {
+            opacity: 1;
+            transform: translate(-50%, -15px) scale(1);
+        }
+
+        .map-popup .popup-city {
+            color: var(--gold-soft);
+            font-weight: 700;
+            font-size: 0.85rem;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            margin-bottom: 2px;
+        }
+
+        .map-popup .popup-branch {
+            color: #bcc3d0;
+            font-size: 0.7rem;
+            letter-spacing: 0.02em;
+        }
+
+        .map-popup::after {
+            content: '';
+            position: absolute;
+            bottom: -6px;
+            left: 50%;
+            transform: translateX(-50%) rotate(45deg);
+            width: 10px;
+            height: 10px;
+            background: rgba(12, 14, 19, 0.85);
+            border-right: 1px solid rgba(214,168,95,0.4);
+            border-bottom: 1px solid rgba(214,168,95,0.4);
+        }
+
+        /* ===== SPLASH SCREEN ===== */
+        .splash {
+            position: fixed;
+            inset: 0;
+            background: #07090d;
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.6s cubic-bezier(0.2, 0.9, 0.4, 1.1), visibility 0.6s ease;
+        }
+        .splash.hidden {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+        .splash-logo {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 24px;
+            animation: splashReveal 1.6s ease-out;
+        }
+        .splash-logo img {
+            width: 140px;
+            height: auto;
+            filter: drop-shadow(0 0 45px rgba(214,168,95,0.32));
+        }
+        .splash-title {
+            font-size: 1.3rem;
+            letter-spacing: 0.3em;
+            text-transform: uppercase;
+            color: var(--gold-soft);
+            font-weight: 500;
+        }
+        .splash-subtitle {
+            color: rgba(255,255,255,0.55);
+            font-size: 0.85rem;
+            letter-spacing: 0.12em;
+        }
+        @keyframes splashReveal {
+            from { opacity: 0; transform: scale(0.92) translateY(12px); filter: blur(6px); }
+            to { opacity: 1; transform: scale(1) translateY(0); filter: blur(0); }
+        }
+
+        /* ===== LOGIN CARD ===== */
+        .wrapper {
+            min-height: 100dvh;
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            z-index: 10;
+        }
+
+        .login-card {
+            width: 100%;
+            max-width: 440px;
+            background: var(--card);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(214,168,95,0.18);
+            border-radius: 42px;
+            padding: 44px 38px;
+            box-shadow: 0 25px 45px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.05);
+            transition: transform 0.25s ease, border-color 0.3s;
+        }
+        .login-card:hover {
+            border-color: rgba(214,168,95,0.3);
+            box-shadow: 0 30px 55px rgba(0,0,0,0.45);
+        }
+
+        .brand {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+        .brand-mark {
+            width: 100px;
+            height: 100px;
+            margin: 0 auto 20px;
+            border-radius: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, rgba(214,168,95,0.12), rgba(255,255,255,0.02));
+            border: 1px solid rgba(214,168,95,0.25);
+            box-shadow: 0 0 30px rgba(214,168,95,0.12);
+        }
+        .brand-mark img {
+            width: 62px;
+            height: auto;
+            filter: drop-shadow(0 0 16px rgba(214,168,95,0.25));
+        }
+        .brand h1 {
+            font-size: 1.9rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            background: linear-gradient(135deg, #fff, #ddc9a0);
+            background-clip: text;
+            -webkit-background-clip: text;
+            color: transparent;
+            margin-bottom: 8px;
+        }
+        .brand p {
+            color: var(--muted);
+            font-size: 0.9rem;
+            letter-spacing: 0.3px;
+        }
+
+        .form-group {
+            margin-bottom: 22px;
+        }
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 0.73rem;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            color: #bcc3d0;
+            font-weight: 600;
+        }
+        .form-input {
+            width: 100%;
+            height: 56px;
+            border-radius: 24px;
+            border: 1px solid rgba(255,255,255,0.08);
+            background: rgba(20, 24, 32, 0.6);
+            padding: 0 20px;
+            color: white;
+            font-size: 0.96rem;
+            transition: all 0.25s;
+        }
+        .form-input:focus {
+            outline: none;
+            border-color: rgba(214,168,95,0.7);
+            background: rgba(25, 30, 40, 0.8);
+            box-shadow: 0 0 0 4px rgba(214,168,95,0.12);
+        }
+        .login-btn {
+            width: 100%;
+            height: 58px;
+            border: none;
+            border-radius: 32px;
+            margin-top: 12px;
+            background: linear-gradient(105deg, #c8984d, #e0ba79);
+            color: #0f111a;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 8px 20px rgba(214,168,95,0.25);
+        }
+        .login-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 16px 28px rgba(214,168,95,0.35);
+        }
+        .login-btn:active {
+            transform: scale(0.98);
+        }
+        .footer {
+            margin-top: 32px;
+            text-align: center;
+            color: #6b7280;
+            font-size: 0.7rem;
+            letter-spacing: 0.3px;
+        }
+        @media (max-width: 540px) {
+            .login-card {
+                padding: 34px 22px;
+                margin: 16px;
+                border-radius: 32px;
+            }
+            .brand-mark {
+                width: 80px;
+                height: 80px;
+            }
+            .iran-map {
+                width: 140vw;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- SPLASH SCREEN -->
+    <div class="splash" id="splash">
+        <div class="splash-logo">
+            <img src="https://cdn.barista.ir/Lamiz.png" alt="Lamiz">
+            <div class="splash-title">LAMIZ</div>
+            <div class="splash-subtitle">You are going to feel better soon!</div>
+        </div>
+    </div>
+
+    <!-- AMBIENT BACKGROUNDS -->
+    <div class="ambient-bg"></div>
+    <div class="noise"></div>
+
+    <!-- MAP POPUP -->
+    <div id="mapPopup" class="map-popup">
+        <div class="popup-city" id="popupCity">Tehran</div>
+        <div class="popup-branch" id="popupBranch">Central Hub</div>
+    </div>
+
+    <!-- ACCURATE IRAN MAP WITH GLOWING BRANCHES -->
+    <div class="iran-network">
+        <!-- ViewBox mapped perfectly to Iran's Geographic Bounding Box scaled for detail -->
+<svg class="iran-map" viewBox="0 0 1000 1000" preserveAspectRatio="xMidYMid meet" id="iranSvg">
+    <defs>
+        <style>
+            .iran-shape {
+                fill: rgba(255, 255, 255, 0.03);
+                stroke: rgba(214, 168, 95, 0.5);
+                stroke-width: 1.5;
+                stroke-linejoin: round;
+                stroke-linecap: round;
+                filter: drop-shadow(0 0 12px rgba(214,168,95,0.15));
+            }
+            .iran-island {
+                fill: rgba(214, 168, 95, 0.15);
+                stroke: rgba(214, 168, 95, 0.6);
+                stroke-width: 1;
+            }
+            .iran-lake {
+                fill: #07090d; /* Matches your background to create a cutout effect */
+                stroke: rgba(214, 168, 95, 0.3);
+                stroke-width: 0.5;
+            }
+        </style>
+    </defs>
+
+    <!-- MAINLAND IRAN (Ultra-Detailed Cartographic Path) -->
+    <!-- 
+      Starts at NW (Maku), traces Caspian Sea, Khorasan Panhandle, 
+      Afghan/Pakistan border, Strait of Hormuz, Persian Gulf coast, and Khuzestan/Iraq border.
+    -->
+    <path class="iran-shape" d="
+        M 183.5 137.2 L 189.4 135.1 L 198.2 139.6 L 209.5 138.8 L 221.3 145.4 L 235.1 146.9 
+        L 242.8 155.6 L 243.5 167.3 L 253.9 173.8 L 261.2 173.2 L 273.8 185.1 L 283.4 184.5 
+        L 295.6 193.2 L 305.1 190.4 L 311.8 196.5 L 320.2 195.9 L 327.9 201.7 L 338.4 206.1 
+        L 348.5 204.8 L 358.1 210.6 L 372.4 209.2 L 382.9 216.5 L 401.5 220.3 L 413.2 227.1 
+        L 426.8 232.4 L 441.5 233.1 L 452.9 226.5 L 466.5 226.8 L 476.9 220.1 L 493.5 219.6 
+        L 511.2 225.8 L 526.4 227.1 L 542.8 221.9 L 559.2 214.3 L 575.5 206.8 L 591.1 198.4 
+        L 606.5 190.5 L 619.8 185.2 L 634.5 180.1 L 650.2 178.5 L 666.8 174.4 L 682.5 174.1 
+        L 696.2 168.3 L 709.8 168.1 L 721.4 163.6 L 734.5 163.9 L 745.2 159.2 L 755.9 161.4
+        L 766.1 155.5 L 778.5 147.1 L 791.4 144.3 L 804.5 141.6 L 815.1 135.2 L 826.4 128.8 
+        L 836.5 120.4 L 848.2 119.5 L 855.9 126.3 L 861.4 135.1 L 867.5 148.4 L 865.1 161.2 
+        L 869.4 172.5 L 872.1 185.8 L 878.5 197.1 L 884.2 211.5 L 882.1 226.4 L 887.5 239.1 
+        L 888.8 252.4 L 895.1 264.8 L 898.4 278.1 L 896.2 291.5 L 899.5 304.8 L 903.1 316.5 
+        L 906.4 329.8 L 910.8 342.1 L 912.4 356.5 L 915.2 370.1 L 912.8 385.4 L 915.4 400.1
+        L 919.5 415.8 L 924.1 430.2 L 926.8 445.5 L 928.5 460.1 L 929.1 475.4 L 931.5 489.2 
+        L 933.2 505.5 L 936.8 518.2 L 937.5 534.1 L 939.8 548.5 L 937.4 562.1 L 934.5 577.8 
+        L 932.1 590.2 L 930.5 605.5 L 928.4 620.1 L 927.5 635.8 L 926.1 651.1 L 922.8 665.4 
+        L 919.5 678.8 L 914.2 692.1 L 910.5 706.5 L 905.8 720.1 L 904.2 735.4 L 900.5 748.8 
+        L 894.1 760.2 L 886.5 771.5 L 878.2 783.1 L 868.5 793.4 L 858.1 806.8 L 848.5 818.2 
+        L 836.4 830.5 L 825.2 841.1 L 812.8 850.5 L 800.5 860.1 L 788.1 867.5 L 775.5 874.2 
+        L 762.1 881.5 L 750.8 887.1 L 736.5 890.8 L 722.1 893.5 L 708.5 895.1 L 694.2 896.8 
+        L 680.5 896.1 L 665.8 896.5 
+        L 652.1 897.8 L 638.5 895.5 L 624.2 892.1 L 610.5 889.5 L 596.1 890.8 L 581.5 886.5 
+        L 568.2 881.1 L 553.8 875.5 L 540.5 868.2 L 526.1 861.8 L 511.5 855.1 L 498.2 848.5 
+        L 484.5 842.1 L 471.1 835.8 L 458.5 828.5 L 444.8 823.1 L 431.5 816.5 L 418.2 809.8 
+        L 404.5 803.5 L 391.1 796.8 L 378.5 788.5 L 365.1 780.2 L 351.5 771.8 L 338.2 763.5 
+        L 325.5 756.1 L 312.1 748.8 L 299.8 739.5 L 286.5 730.2 L 273.8 720.5 L 261.5 710.8 
+        L 248.8 700.5 L 236.1 690.2 L 224.5 678.8 L 211.8 668.5 L 200.5 656.1 
+        L 189.5 644.8 L 178.1 631.5 L 167.5 618.2 L 158.5 604.8 L 148.1 591.5 L 138.5 578.1 
+        L 128.1 563.8 L 118.5 549.5 L 109.8 535.1 L 101.5 520.8 L 92.1 506.5 L 83.8 492.1 
+        L 76.5 476.8 L 68.1 462.5 L 61.5 447.1 L 55.8 431.8 L 51.5 416.5 L 47.1 401.1 
+        L 43.8 385.8 L 41.5 370.5 L 39.1 354.1 L 38.5 338.8 L 39.8 323.5 L 42.1 308.1 
+        L 45.8 293.8 L 50.5 279.5 L 56.1 265.1 L 63.5 251.8 L 71.8 238.5 L 80.1 226.1 
+        L 89.5 214.8 L 100.1 204.5 L 111.5 194.1 L 123.8 185.8 L 136.5 178.5 L 149.8 171.1 
+        L 162.1 162.8 L 173.5 152.5 L 183.5 137.2 Z
+    "/>
+
+    <!-- LAKE URMIA (Azerbaijan precision cutout) -->
+    <path class="iran-lake" d="
+        M 195 245 C 190 255, 192 265, 198 275 C 205 285, 215 280, 220 270 
+        C 225 260, 215 250, 208 245 C 200 240, 198 242, 195 245 Z
+    "/>
+
+    <!-- QESHM ISLAND (Strait of Hormuz precision) -->
+    <path class="iran-island" d="
+        M 625 828 L 635 825 L 650 830 L 665 832 L 670 838 L 655 842 L 640 840 L 628 835 Z
+    "/>
+
+    <!-- KISH ISLAND (Persian Gulf) -->
+    <!-- Matches your request for the two Kish branches -->
+    <path class="iran-island" d="
+        M 565 812 C 568 810, 575 812, 578 816 C 580 820, 572 822, 568 820 C 564 818, 562 815, 565 812 Z
+    "/>
+    
+    <!-- LAVAN ISLAND -->
+    <ellipse class="iran-island" cx="525" cy="800" rx="6" ry="3" transform="rotate(-15 525 800)" />
+
+    <!-- DYNAMIC GROUPS (Your branches & lines will be injected here by JS) -->
+    <g id="networkLines" class="connection-group"></g>
+    <g id="branchNodes" class="nodes-group"></g>
+    <g id="flowParticles" class="particle-group"></g>
+</svg>
+    </div>
+
+    <!-- LOGIN CARD -->
+    <div class="wrapper">
+        <div class="login-card">
+            <div class="brand">
+                <div class="brand-mark">
+                    <img src="https://cdn.barista.ir/Lamiz.png" alt="Lamiz">
+                </div>
+                <h1>LAMIZ</h1>
+                <p>You are going to feel better soon!</p>
+            </div>
+
+            <form id="loginForm" method="POST" action="#">
+                <div class="form-group">
+                    <label class="form-label">Employee Number / کد پرسنلی</label>
+                    <input type="text" name="identifier" class="form-input" placeholder="e.g., 9898" required autofocus>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Password / رمز عبور</label>
+                    <input type="password" name="password" class="form-input" placeholder="••••••••" required>
+                </div>
+                <button type="submit" class="login-btn">➤ &nbsp; ورود / ACCESS</button>
+            </form>
+            <div class="footer">
+                
+                <a href="https://sch.lamizcoffee.com/contact">Powered by Planning Team!</a></small>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // SPLASH TIMEOUT
+        window.addEventListener('load', () => {
+            const splashEl = document.getElementById('splash');
+            setTimeout(() => {
+                splashEl.classList.add('hidden');
+            }, 1700);
+        });
+
+        // ========= MAP COORDINATES & BRANCHES =========
+        // Base coordinate mapping tailored exactly to the custom SVG map above.
+        const branches = [
+            // Center & Major Cities
+            { city: "Isfahan", name: "Isfahan Branch", x: 440, y: 520 },
+            { city: "Shiraz", name: "Eram", x: 520, y: 680 },
+            { city: "Ahvaz", name: "", x: 260, y: 570 },
+            { city: "Mehromah", name: "Tehran-Isfahan Road", x: 445, y: 420 },
+
+            // Kish Island (2 Branches)
+            { city: "Kish Island", name: "Mica Mall", x: 585, y: 818 },
+            { city: "Kish Island", name: "Telecabin", x: 593, y: 820 },
+
+            // Mazandaran (North Coast line)
+            { city: "Royan", name: "Mazandaran Coast", x: 450, y: 220 },
+            { city: "Motel Ghoo", name: "Salman Shahr", x: 435, y: 225 },
+            { city: "Izad Shahr", name: "Mazandaran Coast", x: 462, y: 218 },
+            { city: "Babolsar", name: "Khezershahr", x: 495, y: 212 },
+
+            // Karaj (2 Branches)
+            { city: "Karaj", name: "Mehrshahr", x: 410, y: 290 },
+            { city: "Karaj", name: "Azimieh", x: 405, y: 300 }
+        ];
+
+        // Generate 20-25 branches for Tehran (clustered network)
+        const tehranBaseX = 430;
+        const tehranBaseY = 295;
+        const numTehranBranches = 22; // As requested: 20-25
+
+        for(let i = 1; i <= numTehranBranches; i++) {
+            // Distribute randomly but tightly around Tehran
+            const offsetX = (Math.random() - 0.5) * 45;
+            const offsetY = (Math.random() - 0.5) * 35;
+            branches.push({
+                city: "Tehran",
+                name: `Branch ${i}`,
+                x: tehranBaseX + offsetX,
+                y: tehranBaseY + offsetY
+            });
+        }
+
+        const nodeGroup = document.getElementById('branchNodes');
+        const lineGroup = document.getElementById('networkLines');
+        const particleGroup = document.getElementById('flowParticles');
+
+        // Store drawn nodes for the popup logic
+        const renderedNodes = [];
+
+        // 1. Draw Nodes
+        branches.forEach((branch, index) => {
+            const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            circle.setAttribute('cx', branch.x);
+            circle.setAttribute('cy', branch.y);
+            circle.setAttribute('r', branch.city === 'Tehran' ? 2.5 : 4); // Tehran nodes slightly smaller to prevent clutter
+            circle.setAttribute('class', 'branch-node');
+            
+            nodeGroup.appendChild(circle);
+
+            // Save reference for animation
+            renderedNodes.push({ ...branch, element: circle });
+        });
+
+        // 2. Intelligent Network Routing (K-Nearest Neighbors approach to avoid messy webs)
+        const MAX_CONNECTIONS = 3; 
+        const MAX_DISTANCE = 220; // Connect regional hubs
+
+        branches.forEach((a, i) => {
+            // Sort all other branches by distance to 'a'
+            const distances = branches.map((b, j) => {
+                if(i === j) return { index: j, dist: Infinity };
+                const dx = a.x - b.x;
+                const dy = a.y - b.y;
+                return { index: j, dist: Math.hypot(dx, dy) };
+            }).sort((a, b) => a.dist - b.dist);
+
+            // Take the closest ones
+            let connectionsMade = 0;
+            for(let k = 0; k < distances.length; k++) {
+                if(connectionsMade >= MAX_CONNECTIONS) break;
+                if(distances[k].dist > MAX_DISTANCE) break; // Too far to connect directly
+
+                const b = branches[distances[k].index];
+                
+                // Draw line
+                const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                line.setAttribute('x1', a.x);
+                line.setAttribute('y1', a.y);
+                line.setAttribute('x2', b.x);
+                line.setAttribute('y2', b.y);
+                line.setAttribute('class', 'branch-line');
+                
+                // Vary line opacity based on distance
+                const opacity = Math.max(0.1, 0.4 - (distances[k].dist / MAX_DISTANCE) * 0.3);
+                line.style.stroke = `rgba(214,168,95,${opacity})`;
+
+                lineGroup.appendChild(line);
+                connectionsMade++;
+            }
+        });
+
+        // ===== POPUP ANIMATION LOGIC =====
+        const mapPopup = document.getElementById('mapPopup');
+        const popupCity = document.getElementById('popupCity');
+        const popupBranch = document.getElementById('popupBranch');
+        const iranSvg = document.getElementById('iranSvg');
+        
+        let activeNode = null;
+
+        function showRandomNodePopup() {
+            // Remove active class from previous node
+            if(activeNode) {
+                activeNode.element.classList.remove('active-popup');
+                mapPopup.classList.remove('active');
+            }
+
+            // Pick a new random node
+            const randomIndex = Math.floor(Math.random() * renderedNodes.length);
+            activeNode = renderedNodes[randomIndex];
+
+            // Wait a beat before showing next to allow fade-out
+            setTimeout(() => {
+                activeNode.element.classList.add('active-popup');
+                
+                popupCity.textContent = activeNode.city;
+                popupBranch.textContent = activeNode.name;
+
+                // Calculate exact screen position based on SVG scaling
+                const svgRect = iranSvg.getBoundingClientRect();
+                const viewBox = iranSvg.viewBox.baseVal;
+                
+                // SVG coordinates to Screen coordinates ratio
+                const scaleX = svgRect.width / viewBox.width;
+                const scaleY = svgRect.height / viewBox.height;
+
+                // Handle SVG centering offset due to preserveAspectRatio="xMidYMid meet"
+                const renderRatio = Math.min(scaleX, scaleY);
+                const offsetX = (svgRect.width - viewBox.width * renderRatio) / 2;
+                const offsetY = (svgRect.height - viewBox.height * renderRatio) / 2;
+
+                const screenX = svgRect.left + offsetX + (activeNode.x * renderRatio);
+                const screenY = svgRect.top + offsetY + (activeNode.y * renderRatio);
+
+                // Position the HTML popup directly over the SVG node
+                mapPopup.style.left = `${screenX}px`;
+                mapPopup.style.top = `${screenY - 15}px`; // slightly above
+                
+                mapPopup.classList.add('active');
+            }, 400);
+        }
+
+        // Trigger the popup every 2.5 seconds
+        setInterval(showRandomNodePopup, 2500);
+        // Initial trigger
+        setTimeout(showRandomNodePopup, 2000);
+
+        // Mobile Keyboard fix
+        const inputs = document.querySelectorAll('input');
+        inputs.forEach(input => {
+            input.addEventListener('focus', () => document.body.style.overflow = 'auto');
+            input.addEventListener('blur', () => document.body.style.overflow = 'hidden');
+        });
+        
+    </script>
+</body>
+</html>

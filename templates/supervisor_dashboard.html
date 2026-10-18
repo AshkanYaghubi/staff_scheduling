@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<body>
+    <h2>Supervisor Dashboard - Approved Schedules</h2>
+    <a href="{{ url_for('logout') }}">Logout</a>
+    <hr>
+    <table border="1">
+        <tr>
+            <th>Branch</th>
+            <th>Date</th>
+            <th>Hour</th>
+            <th>Approved Barista Staffing Needed</th>
+        </tr>
+        {% for s in schedules %}
+        <tr>
+            <td>{{ s.branch_name }}</td>
+            <td>{{ s.target_date }}</td>
+            <td>{{ s.target_hour }}:00</td>
+            <td>{{ s.required_baristas }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+</body>
+</html>

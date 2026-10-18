@@ -1,0 +1,1703 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<style>
+
+.fc-col-header-cell-cushion {
+    width: 100%;
+    padding-left: 6px !important;
+    padding-right: 6px !important;
+    box-sizing: border-box;
+}
+.cross-hatch {
+    background-image: repeating-linear-gradient(
+        45deg,
+        transparent,
+        transparent 10px,
+        rgba(0,0,0,.05) 10px,
+        rgba(0,0,0,.05) 20px
+    );
+}
+.fc-bg-event { opacity: 0.55 !important; }
+.fc-bg-event .fc-event-title {
+    font-weight: bold;
+    color: #92400E;
+    font-size: 0.85rem;
+    padding-right: 10px;
+    height: 100%;
+    width: 100%;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    text-align: right;
+    box-sizing: border-box;
+    white-space: pre-wrap;
+    line-height: 1.3;
+    text-shadow: 0 0 5px rgba(255,255,255,0.9), 0 0 2px rgba(255,255,255,1);
+}
+.fc-timegrid-event-harness {
+    margin-left: 12px !important;
+    transition: opacity 0.15s ease-in-out;
+}
+.fc-v-event {
+    opacity: 0.95;
+    border-radius: 6px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    transition: width 0.15s, box-shadow 0.15s, transform 0.15s;
+}
+#calendar-mode-wrapper.mode-drawing .fc-timegrid-event-harness {
+    margin-right: 35% !important;
+}
+#calendar-mode-wrapper.mode-drawing .fc-timegrid-event-harness:hover {
+    opacity: 0.15 !important;
+    z-index: 50 !important;
+}
+#calendar-mode-wrapper.mode-assigning .fc-timegrid-event-harness:hover,
+#calendar-mode-wrapper.mode-assigning .fc-timegrid-event-harness.drag-active {
+    z-index: 100 !important;
+}
+#calendar-mode-wrapper.mode-assigning .fc-timegrid-event-harness:hover .fc-v-event,
+#calendar-mode-wrapper.mode-assigning .fc-timegrid-event-harness.drag-active .fc-v-event {
+    width: 260px !important;
+    min-width: 260px !important;
+    position: absolute !important;
+    opacity: 1 !important;
+    box-shadow: 0 15px 30px rgba(0,0,0,0.4) !important;
+    transform: scale(1.02);
+    transform-origin: top left;
+    border: 2px solid #3B82F6 !important;
+}
+body.ghost-mode .fc-timegrid-event-harness {
+    opacity: 0.05 !important;
+    pointer-events: none !important;
+}
+.coverage-strip {
+    position: absolute;
+    left: 0;
+    width: 8px;
+    z-index: 20;
+    pointer-events: none;
+    border-radius: 0 3px 3px 0;
+    transition: opacity 0.2s;
+    box-shadow: 1px 0 3px rgba(0,0,0,0.15);
+    border-right: 1px solid rgba(0,0,0,0.05);
+}
+.dashed-border { border: 2px dashed #1E3A8A !important; }
+#branchInfo {
+    margin-top: 20px;
+    padding: 15px;
+    background: #F9FAFB;
+    border: 1px solid #E5E7EB;
+    border-radius: 8px;
+    display: none;
+}
+#branchInfo h3 { margin-top: 0; color: #1F2937; }
+#branchInfo .info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 10px;
+    margin-top: 10px;
+}
+#branchInfo .info-item { padding: 8px; background: white; border-radius: 4px; }
+#branchInfo .info-label { font-weight: 600; color: #6B7280; font-size: 0.875rem; }
+#branchInfo .info-value { color: #111827; font-size: 1rem; margin-top: 4px; }
+
+/* ============================================================
+   FULL SCREEN MODE STYLING
+   ============================================================ */
+#calendar-mode-wrapper.fullscreen-active {
+    background-color: #F8FAFC !important; /* slate-50 background inside native wrapper */
+    padding: 24px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100% !important;
+    height: 100% !important;
+    box-sizing: border-box !important;
+}
+#calendar-mode-wrapper.fullscreen-active .calendar-outer {
+    height: 0 !important;
+    flex: 1 !important;
+}
+#calendar-mode-wrapper.fullscreen-active #branchInfo {
+    display: none !important; /* hide bottom details card in full screen to optimize calendar heights */
+}
+
+@media (max-width: 767px) {
+    /* Compress Header */
+    .schedule-header-row {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        gap: 12px !important;
+        margin-bottom: 12px !important;
+    }
+    .schedule-header-row h2 { font-size: 1.35rem !important; gap: 10px !important; flex-wrap: wrap; }
+    .schedule-header-row p { font-size: 0.8rem; margin-top: 2px !important; }
+
+    .admin-action-bar {
+        display: flex; flex-wrap: nowrap; overflow-x: auto; gap: 8px;
+        padding-bottom: 4px; -webkit-overflow-scrolling: touch; scrollbar-width: none; width: 100%;
+    }
+    .admin-action-bar::-webkit-scrollbar { display: none; }
+    .admin-action-bar button, .admin-action-bar select { flex-shrink: 0; font-size: 0.78rem !important; padding: 7px 12px !important; white-space: nowrap; }
+
+
+    .calendar-outer {
+        height: calc(100vh - 180px) !important;
+        height: calc(100dvh - 180px) !important;
+        min-height: 400px !important;
+        margin-bottom: 0 !important;
+    }
+    #branchInfo { display: none !important; }
+    .supervisor-sidebar { display: none !important; }
+
+    /* Toolbar compact */
+    .fc-header-toolbar { gap: 6px !important; flex-wrap: nowrap !important; margin-bottom: 10px !important; }
+    .fc-toolbar-chunk  { display: flex; align-items: center; gap: 4px; }
+    .fc .fc-button     { font-size: 0.75rem !important; padding: 6px 10px !important; }
+    .fc-toolbar-title  { font-size: 1rem !important; line-height: 1.3 !important; text-align: center; }
+    .daily-summary-box { display: none !important; }
+
+    /* Modal prevent overflow */
+    .modal-inner { width: calc(100vw - 24px) !important; max-height: 90vh !important; overflow-y: auto !important; margin: 12px !important; }
+}
+
+/* ============================================================
+   MOBILE LIST VIEW STYLING
+   ============================================================ */
+@media (max-width: 767px) {
+    .fc-list-day-cushion {
+        padding: 12px 16px !important;
+        font-size: 0.9rem !important;
+        font-weight: 700 !important;
+        background: #F1F5F9 !important;
+        color: #334155 !important;
+    }
+    .fc-list-event {
+        min-height: 68px !important;
+        transition: background 0.1s;
+        cursor: pointer;
+    }
+    .fc-list-event td {
+        padding-top: 18px !important;
+        padding-bottom: 18px !important;
+        vertical-align: middle !important;
+        border-bottom: 1px solid #E2E8F0 !important;
+        font-size: 1.05rem !important;
+    }
+    .fc-list-event-time {
+        font-weight: 800 !important;
+        color: #3B4A6B !important;
+        min-width: 80px !important;
+    }
+    .fc-list-event-title {
+        font-weight: 700 !important;
+        color: #0F172A !important;
+    }
+    .fc-list-event:active td {
+        background: #EFF6FF !important;
+    }
+    body.pending-assign .fc-list-event td:first-child {
+        border-left: 6px solid #3B82F6 !important;
+        background: #FAFCFF !important;
+    }
+}
+
+/* ============================================================
+   SUPERVISOR MOBILE DRAWER
+   ============================================================ */
+#mobileEmployeeDrawerOverlay {
+    display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.45);
+    z-index: 200; backdrop-filter: blur(2px);
+}
+#mobileEmployeeDrawer {
+    position: fixed; bottom: 0; left: 0; right: 0; background: white;
+    border-radius: 20px 20px 0 0; padding: 0 16px 24px; z-index: 201;
+    transform: translateY(100%); transition: transform 0.32s cubic-bezier(0.32,0.72,0,1);
+    max-height: 72vh; overflow-y: auto; box-shadow: 0 -8px 40px rgba(0,0,0,0.18);
+}
+#mobileEmployeeDrawer.open { transform: translateY(0); }
+.drawer-handle { width: 40px; height: 4px; background: #CBD5E1; border-radius: 2px; margin: 12px auto 16px; }
+#mobileEmployeeDrawer h3 { font-size: 1.1rem; font-weight: 700; color: #1E293B; margin-bottom: 4px; text-align: center; }
+
+#mobileEmployeeList .mobile-emp-card {
+    display: flex; align-items: center; gap: 10px; padding: 14px 16px;
+    background: #F8FAFC; border: 1.5px solid #E2E8F0; border-radius: 12px;
+    margin-bottom: 8px; cursor: pointer; transition: background 0.15s, border-color 0.15s;
+    -webkit-tap-highlight-color: transparent;
+}
+#mobileEmployeeList .mobile-emp-card.selected {
+    background: #EFF6FF; border-color: #3B82F6; box-shadow: 0 0 0 3px rgba(59,130,246,0.15);
+}
+#mobileEmployeeList .mobile-emp-card .emp-avatar {
+    width: 38px; height: 38px; background: linear-gradient(135deg, #93C5FD, #6366F1);
+    border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    color: white; font-size: 0.9rem; font-weight: 700; flex-shrink: 0;
+}
+#mobileEmployeeList .mobile-emp-card .emp-name { font-size: 1rem; font-weight: 600; color: #1E293B; }
+#mobileEmployeeList .mobile-emp-card .emp-tag {
+    margin-left: auto; font-size: 0.75rem; background: #3B82F6; color: white;
+    padding: 3px 10px; border-radius: 999px; font-weight: 700; display: none;
+}
+#mobileEmployeeList .mobile-emp-card.selected .emp-tag { display: block; }
+
+#mobileFab {
+    display: none; position: fixed; bottom: 24px; right: 20px; z-index: 190;
+    width: 60px; height: 60px; background: linear-gradient(135deg, #3B82F6, #6366F1);
+    color: white; border: none; border-radius: 50%; box-shadow: 0 6px 20px rgba(59,130,246,0.45);
+    font-size: 1.4rem; cursor: pointer; align-items: center; justify-content: center;
+    transition: transform 0.2s; -webkit-tap-highlight-color: transparent;
+}
+@media (max-width: 767px) { #mobileFab { display: flex; } }
+#mobileFab:active { transform: scale(0.93); }
+#mobileFab .fab-badge {
+    position: absolute; top: -2px; right: -2px; width: 20px; height: 20px;
+    background: #22C55E; border-radius: 50%; border: 2px solid white; display: none;
+}
+#mobileFab.has-selection .fab-badge { display: block; }
+
+#tapAssignBanner {
+    display: none; position: fixed; bottom: 95px; left: 50%; transform: translateX(-50%);
+    background: #1E293B; color: white; font-size: 0.85rem; font-weight: 700;
+    padding: 10px 22px; border-radius: 999px; z-index: 190; white-space: nowrap;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.3); pointer-events: none;
+    animation: bannerIn 0.25s ease;
+}
+@keyframes bannerIn { from { opacity: 0; transform: translateX(-50%) translateY(10px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+
+#swipeHint {
+    display: none; position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%);
+    background: rgba(30,41,59,0.85); color: white; font-size: 0.8rem; font-weight: 600;
+    padding: 8px 20px; border-radius: 999px; pointer-events: none; white-space: nowrap;
+    z-index: 50; animation: swipeHintIn 0.4s ease, swipeHintOut 0.5s ease 2.8s forwards;
+}
+@keyframes swipeHintIn  { from { opacity:0; transform: translateX(-50%) translateY(6px); } to { opacity:1; transform: translateX(-50%) translateY(0); } }
+@keyframes swipeHintOut { from { opacity:1; } to { opacity:0; } }
+</style>
+
+<div id="calendar-mode-wrapper" class="{% if view_type == 'admin' %}mode-drawing{% else %}mode-assigning{% endif %}">
+
+    <!-- Header Controls -->
+    <div class="schedule-header-row flex justify-between items-end mb-4">
+        <div>
+            <h2 class="text-3xl font-bold text-slate-800 flex items-center gap-4">
+                {% if view_type == 'admin' %} Official Schedule {% else %} Assign Staff to Shifts {% endif %}
+
+                {% if view_type == 'admin' %}
+                <div class="flex bg-slate-200 p-1 rounded-lg">
+                    <button id="btnModeDraw" class="px-4 py-1.5 rounded-md text-sm font-bold bg-white shadow-sm text-slate-800 transition">
+                        <i class="fa-solid fa-paintbrush mr-1"></i> Draw Mode
+                    </button>
+                    <button id="btnModeAssign" class="px-4 py-1.5 rounded-md text-sm font-bold text-slate-500 hover:text-slate-800 transition">
+                        <i class="fa-solid fa-users mr-1"></i> Supervisor View
+                    </button>
+                </div>
+                {% endif %}
+            </h2>
+            <p class="text-slate-500 mt-1">
+                {% if view_type == 'admin' %}
+                    Switch between drawing missing shifts, or viewing the assigned roster.
+                {% else %}
+                    Viewing schedule for branch: <strong class="text-amber-600">{{ current_user.branch_name or "Unassigned" }}</strong>.
+                {% endif %}
+            </p>
+        </div>
+
+        <div class="admin-action-bar flex gap-3 items-center">
+            {% if view_type == 'admin' %}
+            <button id="btnUndo" class="bg-indigo-50 text-indigo-700 border border-indigo-200 px-4 py-2 rounded-lg shadow-sm font-semibold hover:bg-indigo-100 transition flex items-center">
+                <i class="fa-solid fa-rotate-left mr-2"></i> Undo Change
+            </button>
+            <button id="btnOpenDeadline" class="bg-rose-50 text-rose-600 border border-rose-200 px-4 py-2 rounded-lg shadow-sm font-semibold hover:bg-rose-100 transition flex items-center">
+                <i class="fa-solid fa-clock-rotate-left mr-2"></i> Set Deadline
+            </button>
+            <select id="branchFilter" class="bg-white border border-slate-300 text-slate-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-amber-500 outline-none shadow-sm">
+                <option value="">-- Select a Branch --</option>
+                {% for b in all_branches %}
+                    <option value="{{ b }}">{{ b }}</option>
+                {% endfor %}
+            </select>
+            <button id="btnShiftTimes" disabled
+                class="bg-slate-100 text-slate-400 px-4 py-2 rounded-lg shadow-sm font-semibold transition flex items-center cursor-not-allowed">
+                <i class="fa-solid fa-clock mr-2"></i> Shift Times
+            </button>
+            <button id="btnAutoDraw" disabled
+                class="bg-indigo-50 text-indigo-400 border border-indigo-200 px-4 py-2 rounded-lg shadow-sm font-semibold transition flex items-center cursor-not-allowed">
+                <i class="fa-solid fa-wand-magic-sparkles mr-2"></i> Auto-Draw
+            </button>
+            <button id="btnCopyWeek" disabled
+                class="bg-amber-50 text-amber-400 border border-amber-200 px-4 py-2 rounded-lg shadow-sm font-semibold transition flex items-center cursor-not-allowed">
+                <i class="fa-solid fa-copy mr-2"></i> Copy Prev Week
+            </button>
+            <button id="btnGlobalCopyLast" class="bg-emerald-50 text-emerald-600 border border-emerald-200 px-4 py-2 rounded-lg shadow-sm font-semibold hover:bg-emerald-100 transition flex items-center">
+                <i class="fa-solid fa-layer-group mr-2"></i> Global Paste Last Week
+            </button>
+            <button id="btnApprove" class="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 shadow-sm font-semibold transition flex items-center">
+                <i class="fa-solid fa-paper-plane mr-2"></i> Publish
+            </button>
+            {% endif %}
+
+            <!-- Full Screen Toggle Button (Always visible) -->
+            <button id="btnFullScreen" class="bg-slate-100 text-slate-700 border border-slate-300 px-4 py-2 rounded-lg shadow-sm font-semibold hover:bg-slate-200 transition flex items-center">
+                <i class="fa-solid fa-expand mr-2"></i> Full Screen
+            </button>
+
+<!-- Copy Week Modal -->
+<div id="copyWeekModal" class="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 hidden">
+    <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm">
+        <h3 class="text-lg font-bold text-slate-800 mb-1 flex items-center gap-2">
+            <i class="fa-solid fa-copy text-amber-500"></i> Copy Previous Week Shifts
+        </h3>
+        <p class="text-sm text-slate-500 mb-4">Copies all draft &amp; approved shifts from the selected source week to the current view week as <strong>drafts</strong>.</p>
+        <label class="block text-xs font-semibold text-slate-600 mb-1">Source week starting (Monday)</label>
+        <input type="date" id="copyFromDate" class="border border-slate-300 rounded-lg px-3 py-2 w-full text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-amber-400" />
+        <div class="flex gap-2 justify-end">
+            <button id="btnCopyWeekCancel" class="px-4 py-2 rounded-lg bg-slate-100 text-slate-600 font-semibold hover:bg-slate-200 text-sm">Cancel</button>
+            <button id="btnCopyWeekConfirm" class="px-4 py-2 rounded-lg bg-amber-500 text-white font-semibold hover:bg-amber-600 text-sm flex items-center gap-2">
+                <i class="fa-solid fa-copy"></i> Copy
+            </button>
+        </div>
+    </div>
+</div>
+        </div>
+    </div>
+
+    <!-- Coverage legend & Tips (admin only) -->
+    {% if view_type == 'admin' %}
+    <div class="flex flex-col gap-2 mb-4 w-full">
+        <div class="coverage-legend flex flex-wrap gap-4 text-xs font-semibold text-slate-500 items-center">
+            <span class="font-bold text-slate-700">Coverage Strip:</span>
+            <span class="flex items-center gap-1"><span style="display:inline-block;width:12px;height:12px;background:#EF4444;border-radius:2px"></span> Less Shift</span>
+            <span class="flex items-center gap-1"><span style="display:inline-block;width:12px;height:12px;background:#22C55E;border-radius:2px"></span> More Shift</span>
+            <span class="flex items-center gap-1"><span style="display:inline-block;width:12px;height:12px;background:#FFFFFF;border:1px solid #ccc;border-radius:2px"></span> Approx Exact</span>
+        </div>
+    </div>
+    <div class="flex flex-col gap-2 mb-4 w-full" dir="rtl">
+        <div class="pro-tips text-xs font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 px-3 py-2 rounded-md shadow-sm w-max" dir="rtl">
+            <i class="fa-solid fa-lightbulb text-amber-500 ml-1"></i> <strong>نکات حرفه‌ای:</strong>
+            ۱. روی هر شیفت هاور کنید تا پشت آن را ببینید. &nbsp;
+            ۲. برای ایجاد شیفت همپوشانی جدید از فضای خالی استفاده کنید. &nbsp;
+            ۳. <strong>کلید SHIFT</strong> را نگه دارید تا پشت شیفت‌ها رسم کنید، یا <strong>روی آن‌ها بکشید تا گروهی حذف شوند!</strong>
+            ۴. <strong>کلید ALT</strong> را نگه دارید و روی شیفت‌ها بکشید تا کپی شوند، سپس به هفته بعد بروید و Paste کنید!
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="flex gap-6 calendar-outer" style="height:75vh;">
+        {% if view_type == 'supervisor' %}
+        <!-- Desktop sidebar (hidden on mobile via CSS) -->
+        <div class="supervisor-sidebar w-64 bg-white rounded-2xl shadow-sm border border-slate-100 p-4 overflow-y-auto hidden md:block">
+            <h3 class="font-bold text-slate-800 border-b pb-2 mb-4">Your Baristas</h3>
+            <div id="employeeList" class="space-y-2"></div>
+        </div>
+        {% endif %}
+
+        <div class="flex-1 bg-white p-6 rounded-2xl shadow-sm border border-slate-100 h-full overflow-hidden" style="min-width:0; position:relative;">
+            <div id="calendar" class="h-full"></div>
+            <div id="swipeHint"><i class="fa-solid fa-arrow-left mr-1"></i> Swipe to change day <i class="fa-solid fa-arrow-right ml-1"></i></div>
+        </div>
+    </div>
+
+    <div id="branchInfo">
+        <h3>Branch Information</h3>
+        <div class="info-grid">
+            <div class="info-item"><div class="info-label">Branch Name (Farsi)</div><div class="info-value" id="branchNameFarsi">-</div></div>
+            <div class="info-item"><div class="info-label">Branch Area</div><div class="info-value" id="branchArea">-</div></div>
+            <div class="info-item"><div class="info-label">Opening Hours</div><div class="info-value" id="branchHours">-</div></div>
+            <div class="info-item"><div class="info-label">Minimum Staff</div><div class="info-value" id="branchMinStaff">-</div></div>
+            <div class="info-item"><div class="info-label">Branch Code</div><div class="info-value" id="branchCode">-</div></div>
+            <div class="info-item"><div class="info-label">Status</div><div class="info-value" id="branchStatus">-</div></div>
+        </div>
+    </div>
+
+    {% if view_type == 'admin' %}
+    <!-- DEADLINE MODAL -->
+    <div id="deadlineModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden flex justify-center items-center z-50">
+        <div class="modal-inner bg-white rounded-2xl p-6 w-[420px] shadow-2xl">
+            <h3 class="text-xl font-bold text-slate-800 mb-2">⏳ Set Custom Deadline</h3>
+            <p class="text-sm text-slate-500 mb-4">Select a specific block of days and set an assignment deadline for them.</p>
+            <div class="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Apply From Date</label>
+                    <input type="date" id="dlPeriodStart" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-rose-400 outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Up To Date</label>
+                    <input type="date" id="dlPeriodEnd" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-rose-400 outline-none">
+                </div>
+            </div>
+            <div class="mb-5">
+                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Lock Shift Edits At (Deadline)</label>
+                <input type="datetime-local" id="dlTime" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-rose-400 outline-none">
+                <p id="dlPreview" class="text-sm text-rose-600 font-bold mt-2 text-right" dir="rtl"></p>
+            </div>
+            <div class="flex gap-3">
+                <button id="btnSaveDeadline" class="flex-1 bg-rose-600 text-white font-bold py-2 rounded-lg hover:bg-rose-700 transition">Save Deadline</button>
+                <button id="btnCancelDeadline" class="flex-1 bg-slate-100 text-slate-600 font-bold py-2 rounded-lg hover:bg-slate-200 transition">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SHIFT MODAL -->
+    <div id="shiftModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden flex justify-center items-center z-50">
+        <div class="modal-inner bg-white rounded-2xl p-6 w-[470px] shadow-2xl">
+            <h3 class="text-xl font-bold text-slate-800 mb-4" id="modalHeader">Draw Official Shift</h3>
+            <input type="hidden" id="shiftId">
+            <div class="mb-4">
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Quick Fill from Setup</label>
+                <div class="flex gap-2">
+                    <button type="button" id="btnFillMorning"
+                        class="flex-1 bg-amber-50 text-amber-700 border border-amber-200 font-semibold py-2 rounded-lg hover:bg-amber-100 transition text-sm flex items-center justify-center gap-1">
+                        🌅 Morning
+                    </button>
+                    <button type="button" id="btnFillEvening"
+                        class="flex-1 bg-indigo-50 text-indigo-700 border border-indigo-200 font-semibold py-2 rounded-lg hover:bg-indigo-100 transition text-sm flex items-center justify-center gap-1">
+                        🌙 Evening
+                    </button>
+                </div>
+                <p id="quickFillHint" class="text-xs text-slate-400 mt-1 hidden">Configure via "Shift Times".</p>
+            </div>
+            <div class="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Start Time</label>
+                    <input type="datetime-local" id="shiftStart" class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">End Time</label>
+                    <input type="datetime-local" id="shiftEnd" class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm">
+                </div>
+            </div>
+            <div class="mb-4">
+                <label class="block text-sm font-semibold text-slate-700 mb-1">Shift Title</label>
+                <input type="text" id="shiftTitle" placeholder="e.g. Morning Lead" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+            </div>
+            <div class="mb-6">
+                <label class="block text-sm font-semibold text-slate-700 mb-1">Shift Description</label>
+                <textarea id="shiftDescription" rows="2" placeholder="Duties..." class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"></textarea>
+            </div>
+            <div class="flex justify-between gap-3">
+                <button id="btnDeleteShift" class="hidden flex-1 bg-red-100 text-red-600 font-bold py-2 rounded-lg hover:bg-red-200 transition">Delete</button>
+                <button id="btnSaveShift"   class="flex-1 bg-blue-600 text-white font-bold py-2 rounded-lg hover:bg-blue-700 transition">Save Shift</button>
+            </div>
+            <button id="btnCancelShift" class="w-full mt-3 text-slate-500 text-sm hover:text-slate-800 font-semibold py-2">Cancel</button>
+        </div>
+    </div>
+
+    <!-- SHIFT TIMES MODAL -->
+    <div id="shiftTimesModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden flex justify-center items-center z-50">
+        <div class="modal-inner bg-white rounded-2xl p-6 w-[420px] shadow-2xl">
+            <h3 class="text-xl font-bold text-slate-800 mb-1">⏰ Branch Shift Times</h3>
+            <p class="text-sm text-slate-500 mb-5" id="shiftTimesModalBranch">Set times used by the auto-generator for this branch.</p>
+            <div class="mb-5">
+                <div class="flex items-center gap-2 mb-3">
+                    <span class="text-lg">🌅</span>
+                    <span class="text-sm font-bold text-amber-700 uppercase tracking-wider">Morning Window</span>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="text-xs text-slate-500 font-semibold block mb-1">Start</label>
+                        <input type="time" id="stMorningStart" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-400 outline-none">
+                    </div>
+                    <div>
+                        <label class="text-xs text-slate-500 font-semibold block mb-1">End</label>
+                        <input type="time" id="stMorningEnd" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-400 outline-none">
+                    </div>
+                </div>
+            </div>
+            <div class="mb-6">
+                <div class="flex items-center gap-2 mb-3">
+                    <span class="text-lg">🌙</span>
+                    <span class="text-sm font-bold text-indigo-700 uppercase tracking-wider">Evening Window</span>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="text-xs text-slate-500 font-semibold block mb-1">Start</label>
+                        <input type="time" id="stEveningStart" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-400 outline-none">
+                    </div>
+                    <div>
+                        <label class="text-xs text-slate-500 font-semibold block mb-1">End</label>
+                        <input type="time" id="stEveningEnd" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-400 outline-none">
+                    </div>
+                </div>
+            </div>
+            <div class="flex gap-3">
+                <button id="btnSaveShiftTimes"   class="flex-1 bg-blue-600 text-white font-bold py-2 rounded-lg hover:bg-blue-700 transition">Save</button>
+                <button id="btnCancelShiftTimes" class="flex-1 bg-slate-100 text-slate-600 font-bold py-2 rounded-lg hover:bg-slate-200 transition">Cancel</button>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- CLIPBOARD BANNER (ALT + DRAG TO COPY) -->
+    <div id="clipboardBanner" class="fixed bottom-8 left-1/2 transform -translate-x-1/2 bg-slate-900 text-white px-6 py-3 rounded-full shadow-2xl z-[100] hidden flex items-center gap-4 transition-all duration-300">
+        <span id="clipboardText" class="font-bold text-sm flex items-center gap-2">
+            <i class="fa-solid fa-copy text-blue-400"></i> 0 shifts copied
+        </span>
+        <div class="flex gap-2 border-l border-slate-700 pl-4">
+            <button id="btnPasteClipboard" class="bg-blue-600 text-white px-4 py-1.5 rounded-full text-sm font-bold hover:bg-blue-500 shadow-sm transition">
+                Paste Here
+            </button>
+            <button id="btnClearClipboard" class="bg-slate-800 text-slate-400 px-3 py-1.5 rounded-full text-xs font-bold hover:text-white hover:bg-slate-700 transition">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+    </div>
+
+</div>
+
+<!-- =====================================================
+     SUPERVISOR: MOBILE EMPLOYEE DRAWER
+     ===================================================== -->
+{% if view_type == 'supervisor' %}
+<div id="mobileEmployeeDrawerOverlay"></div>
+<div id="mobileEmployeeDrawer">
+    <div class="drawer-handle"></div>
+    <h3 id="drawerTitle">Your Baristas</h3>
+    <p id="drawerSubtitle" class="text-xs text-slate-500 text-center mb-3 -mt-2">Tap a barista, then tap a shift to assign them.</p>
+    <div id="mobileEmployeeList"></div>
+</div>
+
+<button id="mobileFab" aria-label="Assign Staff">
+    <i class="fa-solid fa-users"></i>
+    <span class="fab-badge"></span>
+</button>
+
+<div id="tapAssignBanner"></div>
+{% endif %}
+
+
+<script>
+(function() {
+    'use strict';
+
+    const viewType = "{{ view_type }}";
+    const isMobile = window.innerWidth < 768;
+
+    let calendar   = null;
+    let activeDeadlines = [];
+    let branchShiftTimes = { morning_shift_start: null, morning_shift_end: null, evening_shift_start: null, evening_shift_end: null };
+    let coverageMap = {};
+
+    let clipboard = { shifts: [], sourceViewStart: null };
+    // Mobile tap-to-assign state
+    let selectedEmployee = null; // { id, name }
+    let pendingShiftToAssign = null; // For the "Tap Shift First" flow
+
+    function formatForInput(isoString) { return isoString ? isoString.substring(0, 16) : ''; }
+
+    function getLocalYYYYMMDD(date) {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    }
+
+    function toJalaliString(isoDateStr) {
+        if (!isoDateStr) return '';
+        const d = new Date(isoDateStr);
+        return new Intl.DateTimeFormat('fa-IR', {
+            calendar: 'persian', dateStyle: 'full', timeStyle: 'short'
+        }).format(d);
+    }
+
+    function encodeBranch(branch) { return encodeURIComponent(branch || ''); }
+
+    function getLockStatus(dateStr) {
+        const target = activeDeadlines.find(d => dateStr >= d.period_start && dateStr <= d.period_end);
+        if (!target) return null;
+        const isLocked = new Date() > new Date(target.deadline);
+        return { locked: isLocked, deadlineText: toJalaliString(target.deadline) };
+    }
+
+    async function apiFetch(url, options = {}) {
+        const res = await fetch(url, { headers: { 'Content-Type': 'application/json' }, ...options });
+        if (!res.ok) {
+            const json = await res.json().catch(() => ({}));
+            throw new Error(json.error || `HTTP ${res.status}`);
+        }
+        return res.json();
+    }
+
+    function loadBranchInfo(branchName) {
+        const container = document.getElementById('branchInfo');
+        if (!container) return;
+        if (!branchName) { container.style.display = 'none'; return; }
+
+        fetch(`/api/branch_info/${encodeBranch(branchName)}`)
+            .then(r => r.ok ? r.json() : Promise.reject('Not found'))
+            .then(data => {
+                document.getElementById('branchNameFarsi').textContent = data.branch_name_farsi || '-';
+                document.getElementById('branchArea').textContent      = data.branch_area ? `${data.branch_area} m²` : '-';
+                document.getElementById('branchHours').textContent     = (data.opening_hour && data.closing_hour) ? `${data.opening_hour} - ${data.closing_hour}` : '-';
+                document.getElementById('branchMinStaff').textContent  = data.branch_minimum_staff ?? '-';
+                document.getElementById('branchCode').textContent      = data.branch_code_mupra || '-';
+                document.getElementById('branchStatus').textContent    = data.branch_status || '-';
+                if (!isMobile) container.style.display = 'block'; // Ensure it only shows on desktop
+
+                branchShiftTimes = {
+                    morning_shift_start: data.morning_shift_start || null,
+                    morning_shift_end:   data.morning_shift_end   || null,
+                    evening_shift_start: data.evening_shift_start || null,
+                    evening_shift_end:   data.evening_shift_end   || null
+                };
+
+                const hint = document.getElementById('quickFillHint');
+                if (hint) hint.classList.toggle('hidden', !!(data.morning_shift_start || data.evening_shift_start));
+            })
+            .catch(() => { container.style.display = 'none'; });
+    }
+
+    /* =========================================================
+       EMPLOYEE LIST — desktop sidebar + mobile drawer
+       ========================================================= */
+    function initEmployeeList() {
+        if (viewType !== 'supervisor') return;
+
+        fetch('/api/employees')
+            .then(r => r.ok ? r.json() : [])
+            .then(emps => {
+                // --- Desktop sidebar ---
+                const deskList = document.getElementById('employeeList');
+                if (deskList) {
+                    deskList.innerHTML = emps.length === 0 ? '<p class="text-sm text-slate-500">No baristas found.</p>' : '';
+                    emps.forEach(e => {
+                        const div = document.createElement('div');
+                        div.className = 'p-3 bg-slate-50 border border-slate-200 rounded-lg cursor-grab hover:bg-slate-100 flex items-center mb-2';
+                        div.draggable = true;
+                        div.innerHTML = `<i class="fa-solid fa-user-circle text-slate-400 mr-2 text-xl"></i><div class="text-sm font-semibold text-slate-700">${e.name}</div>`;
+                        div.addEventListener('dragstart', ev => {
+                            ev.dataTransfer.setData('empId', e.id);
+                            ev.dataTransfer.setData('empName', e.name);
+                        });
+                        deskList.appendChild(div);
+                    });
+                }
+
+                // --- Mobile drawer list ---
+                const mobList = document.getElementById('mobileEmployeeList');
+                if (mobList) {
+                    mobList.innerHTML = emps.length === 0 ? '<p class="text-sm text-center text-slate-400 py-4">No baristas found.</p>' : '';
+                    emps.forEach(e => {
+                        const initials = e.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+                        const card = document.createElement('div');
+                        card.className = 'mobile-emp-card';
+                        card.innerHTML = `
+                            <div class="emp-avatar">${initials}</div>
+                            <div class="emp-name">${e.name}</div>
+                            <span class="emp-tag">Selected</span>
+                        `;
+                        card.addEventListener('click', () => selectEmployee(e.id, e.name, card));
+                        mobList.appendChild(card);
+                    });
+                }
+            });
+    }
+
+    /* =========================================================
+       MOBILE TAP-TO-ASSIGN
+       ========================================================= */
+    function selectEmployee(id, name, cardEl) {
+        if (pendingShiftToAssign) {
+            const shiftTitle = pendingShiftToAssign.title;
+            if (!confirm(`Assign ${name} to ${shiftTitle}?`)) return;
+
+            const shiftId = pendingShiftToAssign.id.replace('shift_', '');
+            
+            // Show selection visually before closing
+            document.querySelectorAll('.mobile-emp-card').forEach(c => c.classList.remove('selected'));
+            cardEl.classList.add('selected');
+
+            setTimeout(() => {
+                apiFetch(`/api/shifts/${shiftId}/assign`, {
+                    method: 'POST', body: JSON.stringify({ emp_id: id, emp_name: name })
+                }).then(() => {
+                    pendingShiftToAssign = null;
+                    closeDrawer();
+                    calendar.refetchEvents();
+                }).catch(err => {
+                    alert(err.message);
+                    closeDrawer();
+                });
+            }, 300);
+            return;
+        }
+
+        document.querySelectorAll('#mobileEmployeeList .mobile-emp-card').forEach(c => c.classList.remove('selected'));
+        const fab = document.getElementById('mobileFab');
+
+        if (selectedEmployee && selectedEmployee.id === id) {
+            // Tap same → deselect
+            selectedEmployee = null;
+            if (fab) fab.classList.remove('has-selection');
+            document.body.classList.remove('pending-assign');
+            hideTapBanner();
+        } else {
+            selectedEmployee = { id, name };
+            cardEl.classList.add('selected');
+            if (fab) fab.classList.add('has-selection');
+            document.body.classList.add('pending-assign');
+
+            setTimeout(() => {
+                closeDrawer();
+                showTapBanner(`Tap a shift to assign ${name}`);
+            }, 350);
+        }
+    }
+
+    function showTapBanner(msg) {
+        const banner = document.getElementById('tapAssignBanner');
+        if (!banner) return;
+        banner.textContent = msg;
+        banner.style.display = 'block';
+    }
+    function hideTapBanner() {
+        const banner = document.getElementById('tapAssignBanner');
+        if (banner) banner.style.display = 'none';
+    }
+
+    /* =========================================================
+       MOBILE DRAWER
+       ========================================================= */
+    function openDrawer(mode = 'select_first') {
+        const overlay = document.getElementById('mobileEmployeeDrawerOverlay');
+        const drawer  = document.getElementById('mobileEmployeeDrawer');
+        const titleEl = document.getElementById('drawerTitle');
+        const subEl   = document.getElementById('drawerSubtitle');
+        
+        if (!overlay || !drawer) return;
+
+        // Contextual messaging
+        if (mode === 'shift_first' && pendingShiftToAssign) {
+            titleEl.textContent = "Assign to: " + pendingShiftToAssign.title;
+            subEl.textContent = "Tap a barista below to assign them to this shift.";
+            subEl.classList.add('text-blue-600', 'font-bold');
+        } else {
+            titleEl.textContent = "Your Baristas";
+            subEl.textContent = "Tap a barista, then tap a shift to assign them.";
+            subEl.classList.remove('text-blue-600', 'font-bold');
+        }
+
+        overlay.style.display = 'block';
+        requestAnimationFrame(() => drawer.classList.add('open'));
+    }
+    
+    function closeDrawer() {
+        const overlay = document.getElementById('mobileEmployeeDrawerOverlay');
+        const drawer  = document.getElementById('mobileEmployeeDrawer');
+        if (!overlay || !drawer) return;
+        
+        drawer.classList.remove('open');
+        setTimeout(() => { 
+            overlay.style.display = 'none'; 
+            if (!selectedEmployee) pendingShiftToAssign = null;
+        }, 320);
+    }
+
+    /* =========================================================
+       CALENDAR RENDERING HELPERS
+       ========================================================= */
+    function renderDailyTotals(events) {
+        const dayStats = {};
+
+        events.forEach(ev => {
+            const dateKey = ev.start.split('T')[0];
+            const timePart = ev.start.split('T')[1];
+            const hour = timePart ? parseInt(timePart.substring(0,2)) : 0;
+
+            if (!dayStats[dateKey]) {
+                dayStats[dateKey] = { manHrs: 0, totalShifts: 0, morningShifts: 0, nightShifts: 0, maxMorning: 0, maxNight: 0 };
+            }
+
+            let isMorning = hour < 16;
+            if (branchShiftTimes && branchShiftTimes.morning_shift_end) {
+                const mEnd = parseInt(branchShiftTimes.morning_shift_end.split(':')[0]);
+                isMorning = hour < mEnd;
+            }
+
+            if (ev.extendedProps?.type === 'shift') {
+                dayStats[dateKey].totalShifts++;
+                if (isMorning) dayStats[dateKey].morningShifts++;
+                else dayStats[dateKey].nightShifts++;
+            }
+
+            if (ev.extendedProps?.type === 'recommendation') {
+                const req = parseFloat(ev.extendedProps.baristas || 0);
+                dayStats[dateKey].manHrs += req;
+                if (isMorning) { if (req > dayStats[dateKey].maxMorning) dayStats[dateKey].maxMorning = req; }
+                else           { if (req > dayStats[dateKey].maxNight)   dayStats[dateKey].maxNight   = req; }
+            }
+        });
+
+        requestAnimationFrame(() => {
+            document.querySelectorAll('.fc-col-header-cell').forEach(cell => {
+                const dateStr = cell.getAttribute('data-date');
+                const existing = cell.querySelector('.daily-summary-box');
+                if (existing) existing.remove();
+
+                if (dateStr && dayStats[dateStr]) {
+                    const stats = dayStats[dateStr];
+                    const cushion = cell.querySelector('.fc-col-header-cell-cushion');
+
+                    if (cushion) {
+                        const box = document.createElement('div');
+                        box.className = 'daily-summary-box mt-2 mb-1 px-2 py-2 bg-slate-50 border border-slate-200 rounded text-left text-[11px] leading-tight shadow-sm w-full box-border font-normal';
+
+                        const lockStatus = getLockStatus(dateStr);
+                        let lockHtml = '';
+                        if (lockStatus) {
+                            if (lockStatus.locked) {
+                                lockHtml = `<div title="مهلت به پایان رسیده است: ${lockStatus.deadlineText}" class="bg-red-100 text-red-700 text-[10px] uppercase tracking-wide font-bold py-1 px-2 rounded mb-2 flex items-center justify-center gap-1 border border-red-200 cursor-help"><i class="fa-solid fa-lock"></i> Locked</div>`;
+                            } else {
+                                lockHtml = `<div title="مهلت باز است تا: ${lockStatus.deadlineText}" class="bg-amber-100 text-amber-700 text-[10px] uppercase tracking-wide font-bold py-1 px-2 rounded mb-2 flex items-center justify-center gap-1 border border-amber-200 cursor-help"><i class="fa-solid fa-clock-rotate-left"></i> Open</div>`;
+                            }
+                        }
+
+                        box.innerHTML = lockHtml + `
+                            <div class="flex justify-between mb-1">
+                                <span class="text-slate-500">Shifts Drawn:</span>
+                                <span class="font-bold text-slate-800">${stats.totalShifts}</span>
+                            </div>
+                            <div class="flex justify-between mb-0.5">
+                                <span class="text-slate-400">└ Mornings:</span>
+                                <span class="font-bold text-amber-600">${stats.morningShifts}</span>
+                            </div>
+                            <div class="flex justify-between mb-2">
+                                <span class="text-slate-400">└ Nights:</span>
+                                <span class="font-bold text-indigo-600">${stats.nightShifts}</span>
+                            </div>
+                            <div class="my-1.5 border-t border-slate-200"></div>
+                            <div class="flex justify-between mb-1">
+                                <span class="text-slate-500">Max Rec (Morn):</span>
+                                <span class="font-bold text-amber-600">${stats.maxMorning.toFixed(1)}</span>
+                            </div>
+                            <div class="flex justify-between mb-2">
+                                <span class="text-slate-500">Max Rec (Night):</span>
+                                <span class="font-bold text-indigo-600">${stats.maxNight.toFixed(1)}</span>
+                            </div>
+                            <div class="flex justify-between font-bold pt-1.5 border-t border-slate-300 text-slate-800">
+                                <span>Target Total:</span>
+                                <span class="text-[12px]">${(stats.maxMorning + stats.maxNight).toFixed(1)}</span>
+                            </div>
+                        `;
+                        cushion.appendChild(box);
+                    }
+                }
+            });
+        });
+    }
+
+    function buildCoverageMap(events) {
+        coverageMap = {};
+        events.forEach(ev => {
+            if (ev.extendedProps?.type !== 'recommendation') return;
+            const dateStr  = ev.start.split('T')[0];
+            const hour     = parseInt(ev.start.split('T')[1] || '0');
+            const gap      = ev.extendedProps.gap || 0;
+            const required = ev.extendedProps.baristas || 0;
+            if (required === 0) return;
+
+            let color;
+            if      (gap >  0.5) color = '#22C55E';
+            else if (gap < -0.5) color = '#EF4444';
+            else                 color = '#FFFFFF';
+
+            if (!coverageMap[dateStr]) coverageMap[dateStr] = {};
+            coverageMap[dateStr][hour] = color;
+        });
+    }
+
+    function injectCoverageStrips() {
+        document.querySelectorAll('.coverage-strip').forEach(el => el.remove());
+        if (Object.keys(coverageMap).length === 0) return;
+
+        const slotEl = document.querySelector('.fc-timegrid-slot[data-time]');
+        if (!slotEl) return;
+        const slotHeight = slotEl.offsetHeight;
+        const slotsPerHour = 2;
+
+        document.querySelectorAll('.fc-timegrid-col[data-date]').forEach(col => {
+            const dateStr = col.getAttribute('data-date');
+            const dayData = coverageMap[dateStr];
+            if (!dayData) return;
+
+            const frame = col.querySelector('.fc-timegrid-col-frame');
+            if (!frame) return;
+            if (getComputedStyle(frame).position === 'static') frame.style.position = 'relative';
+
+            Object.entries(dayData).forEach(([hourStr, color]) => {
+                const hour  = parseInt(hourStr);
+                const strip = document.createElement('div');
+                strip.className = 'coverage-strip';
+                strip.style.top    = `${hour * slotHeight * slotsPerHour}px`;
+                strip.style.height = `${slotHeight * slotsPerHour}px`;
+                strip.style.background = color;
+                frame.appendChild(strip);
+            });
+        });
+    }
+
+    function getCurrentBranch() {
+        const el = document.getElementById('branchFilter');
+        return el ? el.value : '';
+    }
+
+    async function bulkDeleteShifts(selStart, selEnd) {
+        const shiftsToDelete = calendar.getEvents().filter(e => {
+            if (e.extendedProps?.type !== 'shift') return false;
+            return (e.start < selEnd && e.end > selStart);
+        });
+        if (shiftsToDelete.length === 0) { calendar.unselect(); return; }
+        if (!confirm(`🧨 BULK DELETE:\nYou highlighted ${shiftsToDelete.length} shift(s).\nAre you sure you want to delete ALL of them?`)) {
+            calendar.unselect(); return;
+        }
+        
+        const ids = shiftsToDelete.map(e => parseInt(e.id.replace('shift_', '')));
+        try {
+            await apiFetch('/api/shifts/bulk_delete', { 
+                method: 'POST', 
+                body: JSON.stringify({ ids: ids }) 
+            });
+            calendar.refetchEvents();
+        } catch (err) {
+            alert('Error deleting shifts: ' + err.message);
+            calendar.refetchEvents();
+        }
+    }
+
+    /* =========================================================
+       CALENDAR INIT
+       ========================================================= */
+    function initCalendar() {
+        const el = document.getElementById('calendar');
+        if (!el) return;
+
+        // Mobile toolbar only contains basic navigation. No grid/list toggle available on mobile.
+        const mobileToolbar = {
+            left:   'prev,next',
+            center: 'title',
+            right:  viewType === 'admin' ? 'timeGridDay,listWeek' : 'today'
+        };
+        const desktopToolbar = { left: 'prev,next today', center: 'title', right: 'timeGridWeek,timeGridDay,listWeek' };
+
+        calendar = new FullCalendar.Calendar(el, {
+            // Force ListWeek exclusively on mobile for supervisor. Admin defaults to timeGridDay.
+            initialView:   (isMobile && viewType === 'supervisor') ? 'listWeek' : (isMobile ? 'timeGridDay' : 'timeGridWeek'),
+            height:        '100%', // Crucial to prevent page stretching
+            headerToolbar: isMobile ? mobileToolbar : desktopToolbar,
+            views: {
+                listWeek: { buttonText: 'List View' },
+                timeGridDay: { buttonText: '⊞ Grid' }
+            },
+            allDaySlot:    false,
+            selectable:    viewType === 'admin',
+            selectMirror:  true,
+            slotMinTime:   '00:00:00',
+            slotMaxTime:   '24:00:00',
+            eventOrder:    'type,-start',
+            firstDay:      6, // Saturday
+
+            slotLabelFormat: {
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false  // This forces 24-hour format
+            },
+
+            scrollTime:         isMobile ? '07:00:00' : '00:00:00',
+            nowIndicator:       true,
+            slotEventMinHeight: isMobile ? 44 : 15,
+            slotDuration:       '00:30:00',
+            slotLabelInterval:  '01:00:00',
+            expandRows:         true,
+
+            dayHeaderContent: function(arg) {
+                if (isMobile) {
+                    return new Intl.DateTimeFormat('fa-IR', {
+                        calendar: 'persian', weekday: 'short', day: 'numeric'
+                    }).format(arg.date);
+                }
+                return new Intl.DateTimeFormat('fa-IR', {
+                    calendar: 'persian', weekday: 'long', day: 'numeric', month: 'long'
+                }).format(arg.date);
+            },
+
+            events: async function(fetchInfo, successCallback, failureCallback) {
+                const branch = getCurrentBranch();
+                try {
+                    const dlRes = await fetch(`/api/deadlines?start=${fetchInfo.startStr}&end=${fetchInfo.endStr}`);
+                    activeDeadlines = dlRes.ok ? await dlRes.json() : [];
+
+                    const url = `/api/events?branch=${encodeBranch(branch)}&start=${fetchInfo.startStr}&end=${fetchInfo.endStr}`;
+                    const res = await fetch(url);
+                    if (!res.ok) throw new Error('API Error');
+                    const data = await res.json();
+
+                    renderDailyTotals(data);
+                    buildCoverageMap(data);
+                    successCallback(data);
+                    requestAnimationFrame(() => setTimeout(injectCoverageStrips, 80));
+                } catch (err) {
+                    failureCallback(err);
+                }
+            },
+
+            datesSet: function(info) {
+                document.querySelectorAll('.coverage-strip').forEach(el => el.remove());
+
+                const titleEl = document.querySelector('.fc-toolbar-title');
+                if (titleEl) {
+                    const start = info.start;
+                    const end   = new Date(info.end.getTime() - 1);
+                    const formatter = new Intl.DateTimeFormat('fa-IR', {
+                        calendar: 'persian', day: 'numeric', month: 'long', year: 'numeric'
+                    });
+                    if (info.view.type === 'timeGridDay' || info.view.type === 'listDay') {
+                        titleEl.textContent = formatter.format(start);
+                    } else {
+                        titleEl.textContent = formatter.format(start) + ' تا ' + formatter.format(end);
+                    }
+                }
+            },
+
+            windowResize: function() { requestAnimationFrame(() => setTimeout(injectCoverageStrips, 100)); },
+
+            select: function(info) {
+                if (viewType !== 'admin') return;
+                const branch = getCurrentBranch();
+                if (!branch) { alert('Select a Branch first!'); calendar.unselect(); return; }
+
+                // === 1. COPY SHIFTS (ALT + DRAG) ===
+                if (info.jsEvent && info.jsEvent.altKey) {
+                    const shiftsToCopy = calendar.getEvents().filter(e => {
+                        if (e.extendedProps?.type !== 'shift') return false;
+                        return (e.start < info.end && e.end > info.start);
+                    });
+                    
+                    if (shiftsToCopy.length === 0) { calendar.unselect(); return; }
+
+                    clipboard.shifts = shiftsToCopy.map(e => ({
+                        title: e.title,
+                        description: e.extendedProps.description || '',
+                        start: e.start,
+                        end: e.end,
+                        branch: branch
+                    }));
+                    clipboard.sourceViewStart = new Date(calendar.view.activeStart);
+
+                    document.getElementById('clipboardText').innerHTML = `<i class="fa-solid fa-copy text-blue-400"></i> ${clipboard.shifts.length} shifts copied`;
+                    document.getElementById('clipboardBanner').classList.remove('hidden');
+                    
+                    calendar.unselect();
+                    return;
+                }
+
+                // === 2. DELETE SHIFTS (SHIFT + DRAG) ===
+                if (document.body.classList.contains('ghost-mode') || (info.jsEvent && info.jsEvent.shiftKey)) {
+                    bulkDeleteShifts(info.start, info.end);
+                } else {
+                    // === 3. DRAW NEW SHIFT (NORMAL DRAG) ===
+                    openShiftModal(null, info.startStr, info.endStr);
+                }
+            },
+
+            eventClick: function(info) {
+                const props = info.event.extendedProps;
+
+                // ---- Admin: open edit modal ----
+                if (viewType === 'admin' && props.type === 'shift') {
+                    openShiftModal(info.event);
+                    return;
+                }
+
+                // ---- Supervisor mobile: tap-to-assign ----
+                if (viewType === 'supervisor' && isMobile && props.type === 'shift') {
+                    const dateStr = info.event.start.toISOString().split('T')[0];
+                    const lockStatus = getLockStatus(dateStr);
+                    if (lockStatus && lockStatus.locked) {
+                        return alert(`⛔ Locked! The deadline for this date passed on:\n${lockStatus.deadlineText}`);
+                    }
+
+                    if (selectedEmployee) {
+                        // User tapped FAB and selected barista first manually
+                        const shiftId  = info.event.id.replace('shift_', '');
+                        const empName  = selectedEmployee.name;
+                        const empId    = selectedEmployee.id;
+
+                        if (!confirm(`Assign ${empName} to this shift?`)) return;
+
+                        apiFetch(`/api/shifts/${shiftId}/assign`, {
+                            method: 'POST', body: JSON.stringify({ emp_id: empId, emp_name: empName })
+                        }).then(() => {
+                            selectedEmployee = null;
+                            const fab = document.getElementById('mobileFab');
+                            if (fab) fab.classList.remove('has-selection');
+                            document.querySelectorAll('#mobileEmployeeList .mobile-emp-card').forEach(c => c.classList.remove('selected'));
+                            document.body.classList.remove('pending-assign');
+                            hideTapBanner();
+                            calendar.refetchEvents();
+                        }).catch(err => alert(err.message));
+                    } else {
+                        // User directly tapped the shift list item first
+                        pendingShiftToAssign = info.event;
+                        openDrawer('shift_first');
+                    }
+                }
+            },
+
+            eventDidMount: function(info) {
+                // Desktop supervisor: drag-and-drop assignment (unchanged)
+                if (viewType === 'supervisor' && !isMobile && info.event.extendedProps?.type === 'shift') {
+                    const el = info.el;
+                    el.addEventListener('dragover',  e => { e.preventDefault(); el.classList.add('drag-active'); });
+                    el.addEventListener('dragleave', ()  => { el.classList.remove('drag-active'); });
+                    el.addEventListener('drop', e => {
+                        e.preventDefault();
+                        el.classList.remove('drag-active');
+
+                        const dateStr = info.event.start.toISOString().split('T')[0];
+                        const lockStatus = getLockStatus(dateStr);
+                        if (lockStatus && lockStatus.locked) {
+                            return alert(`⛔ Locked! The deadline for this date passed on:\n${lockStatus.deadlineText}`);
+                        }
+
+                        const empId   = e.dataTransfer.getData('empId');
+                        const empName = e.dataTransfer.getData('empName');
+                        const shiftId = info.event.id.replace('shift_', '');
+                        if (!empId || !confirm(`Assign ${empName}?`)) return;
+
+                        apiFetch(`/api/shifts/${shiftId}/assign`, {
+                            method: 'POST', body: JSON.stringify({ emp_id: empId, emp_name: empName })
+                        }).then(() => calendar.refetchEvents()).catch(err => alert(err.message));
+                    });
+                }
+            }
+        });
+
+        calendar.render();
+        if (viewType === 'supervisor') calendar.refetchEvents();
+
+        // ---- MOBILE: Swipe left/right to navigate days ----
+        if (isMobile) {
+            const calEl = document.getElementById('calendar');
+            let touchStartX = 0;
+            let touchStartY = 0;
+            let touchStartTime = 0;
+
+            calEl.addEventListener('touchstart', e => {
+                touchStartX    = e.touches[0].clientX;
+                touchStartY    = e.touches[0].clientY;
+                touchStartTime = Date.now();
+            }, { passive: true });
+
+            calEl.addEventListener('touchend', e => {
+                const dx = e.changedTouches[0].clientX - touchStartX;
+                const dy = e.changedTouches[0].clientY - touchStartY;
+                const dt = Date.now() - touchStartTime;
+                if (dt < 400 && Math.abs(dx) > 55 && Math.abs(dx) > Math.abs(dy) * 1.6) {
+                    if (dx < 0) calendar.next();
+                    else        calendar.prev();
+                }
+            }, { passive: true });
+
+            const hint = document.getElementById('swipeHint');
+            if (hint && !sessionStorage.getItem('swipeHintSeen')) {
+                hint.style.display = 'block';
+                setTimeout(() => {
+                    hint.style.display = 'none';
+                    sessionStorage.setItem('swipeHintSeen', '1');
+                }, 3400);
+            }
+        }
+    }
+
+    /* =========================================================
+       SHIFT MODAL & SAVE LOGIC
+       ========================================================= */
+    function openShiftModal(event = null, startStr = null, endStr = null) {
+        document.getElementById('shiftModal').classList.remove('hidden');
+        if (event) {
+            document.getElementById('modalHeader').textContent   = 'Edit Official Shift';
+            document.getElementById('shiftId').value            = event.id.replace('shift_', '');
+            document.getElementById('shiftTitle').value         = event.title;
+            document.getElementById('shiftDescription').value   = event.extendedProps.description || '';
+            document.getElementById('shiftStart').value         = formatForInput(event.startStr);
+            document.getElementById('shiftEnd').value           = formatForInput(event.endStr);
+            document.getElementById('btnDeleteShift').classList.remove('hidden');
+        } else {
+            document.getElementById('modalHeader').textContent   = 'Draw Official Shift';
+            document.getElementById('shiftId').value            = '';
+            document.getElementById('shiftTitle').value         = '';
+            document.getElementById('shiftDescription').value   = '';
+            document.getElementById('shiftStart').value         = formatForInput(startStr);
+            document.getElementById('shiftEnd').value           = formatForInput(endStr);
+            document.getElementById('btnDeleteShift').classList.add('hidden');
+        }
+    }
+
+    function closeShiftModal() {
+        document.getElementById('shiftModal').classList.add('hidden');
+        if (calendar) calendar.unselect();
+    }
+
+    function fillShiftTime(startTime, endTime) {
+        const startIn = document.getElementById('shiftStart');
+        const endIn   = document.getElementById('shiftEnd');
+        if (!startTime || !endTime) { return alert('No shift times configured yet.'); }
+        const datePart = (startIn.value || new Date().toISOString()).split('T')[0];
+        startIn.value = `${datePart}T${startTime}`;
+        endIn.value   = `${datePart}T${endTime}`;
+    }
+
+    async function saveShift() {
+        const branch      = getCurrentBranch();
+        const title       = document.getElementById('shiftTitle').value;
+        const desc        = document.getElementById('shiftDescription').value;
+        const startVal    = document.getElementById('shiftStart').value;
+        const endVal      = document.getElementById('shiftEnd').value;
+        const id          = document.getElementById('shiftId').value;
+
+        // Auto-copy check: if it's a NEW shift on SATURDAY and the WEEK IS EMPTY
+        const shiftDate = new Date(startVal);
+        const isSaturday = shiftDate.getDay() === 6; // Saturday is index 6 in JS
+        const viewStart = calendar.view.activeStart;
+        const viewEnd = calendar.view.activeEnd;
+
+        if (!id && isSaturday) {
+            // Count existing shifts in the visible week
+            const existingShifts = calendar.getEvents().filter(e => e.extendedProps?.type === 'shift' && e.start >= viewStart && e.end <= viewEnd);
+            
+            if (existingShifts.length === 0) {
+                // The week is empty! Automatically generate shifts for the next 6 days (Sat through Fri)
+                const shiftsToCreate = [];
+                for (let i = 0; i < 7; i++) {
+                    const newStart = new Date(startVal);
+                    newStart.setDate(newStart.getDate() + i);
+                    
+                    const newEnd = new Date(endVal);
+                    newEnd.setDate(newEnd.getDate() + i);
+
+                    const pad = (n) => n.toString().padStart(2, '0');
+                    const fmt = (d) => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:00`;
+
+                    shiftsToCreate.push({
+                        branch: branch,
+                        title: title,
+                        description: desc,
+                        start: fmt(newStart),
+                        end: fmt(newEnd)
+                    });
+                }
+
+                try {
+                    await apiFetch('/api/shifts/bulk', { method: 'POST', body: JSON.stringify({ shifts: shiftsToCreate }) });
+                    closeShiftModal();
+                    calendar.refetchEvents();
+                    alert('Week was empty, so this shift was automatically copied to the rest of the week!');
+                    return; // Stop standard execution
+                } catch (err) {
+                    alert('Auto-copy failed: ' + err.message);
+                    return;
+                }
+            }
+        }
+
+        // Standard save operation
+        const payload = {
+            branch:      branch,
+            title:       title,
+            description: desc,
+            start:       startVal + ':00',
+            end:         endVal   + ':00'
+        };
+        
+        try {
+            await apiFetch(id ? `/api/shifts/${id}` : `/api/shifts`, { method: id ? 'PUT' : 'POST', body: JSON.stringify(payload) });
+            closeShiftModal();
+            calendar.refetchEvents();
+        } catch (err) { alert('Save failed: ' + err.message); }
+    }
+
+    function openShiftTimesModal() {
+        document.getElementById('shiftTimesModalBranch').textContent = `Branch: ${getCurrentBranch()}`;
+        document.getElementById('stMorningStart').value = branchShiftTimes.morning_shift_start || '';
+        document.getElementById('stMorningEnd').value   = branchShiftTimes.morning_shift_end   || '';
+        document.getElementById('stEveningStart').value = branchShiftTimes.evening_shift_start || '';
+        document.getElementById('stEveningEnd').value   = branchShiftTimes.evening_shift_end   || '';
+        document.getElementById('shiftTimesModal').classList.remove('hidden');
+    }
+
+    async function saveShiftTimes() {
+        const payload = {
+            morning_shift_start: document.getElementById('stMorningStart').value || null,
+            morning_shift_end:   document.getElementById('stMorningEnd').value   || null,
+            evening_shift_start: document.getElementById('stEveningStart').value || null,
+            evening_shift_end:   document.getElementById('stEveningEnd').value   || null
+        };
+        try {
+            await apiFetch(`/api/branch_info/${encodeBranch(getCurrentBranch())}`, { method: 'PUT', body: JSON.stringify(payload) });
+            branchShiftTimes = payload;
+            document.getElementById('shiftTimesModal').classList.add('hidden');
+            alert('Shift times saved!');
+        } catch (err) { alert('Save failed: ' + err.message); }
+    }
+
+    /* =========================================================
+       EVENT LISTENERS
+       ========================================================= */
+    function initListeners() {
+
+        // --- Undo Button ---
+        const btnUndo = document.getElementById('btnUndo');
+        if (btnUndo) {
+            btnUndo.addEventListener('click', async () => {
+                btnUndo.disabled = true;
+                const originalHtml = btnUndo.innerHTML;
+                btnUndo.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Undoing...';
+                
+                try {
+                    const res = await apiFetch('/api/undo', { method: 'POST' });
+                    alert(res.message || 'Undo successful!');
+                    if (calendar) calendar.refetchEvents();
+                } catch (err) {
+                    alert('Undo failed: ' + err.message);
+                } finally {
+                    btnUndo.disabled = false;
+                    btnUndo.innerHTML = originalHtml;
+                }
+            });
+        }
+
+        // --- Global Paste Last Week Button ---
+        const btnGlobalCopyLast = document.getElementById('btnGlobalCopyLast');
+        if (btnGlobalCopyLast) {
+            btnGlobalCopyLast.addEventListener('click', async () => {
+                const viewStart = calendar.view.activeStart;
+                const toDate = getLocalYYYYMMDD(viewStart); // Local timezone safe formatting
+
+                if (!confirm(`Are you sure you want to copy the LAST PUBLISHED shifts for ALL branches into the week starting ${toDate}?`)) return;
+
+                btnGlobalCopyLast.disabled = true;
+                const originalHtml = btnGlobalCopyLast.innerHTML;
+                btnGlobalCopyLast.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Processing...';
+
+                try {
+                    const res = await apiFetch('/api/shifts/global_copy_last', {
+                        method: 'POST',
+                        body: JSON.stringify({ to_date: toDate })
+                    });
+                    alert(res.message || 'Successfully copied last published weeks for all branches!');
+                    calendar.refetchEvents();
+                } catch (err) {
+                    alert('Error: ' + err.message);
+                }
+
+                btnGlobalCopyLast.disabled = false;
+                btnGlobalCopyLast.innerHTML = originalHtml;
+            });
+        }
+
+
+        // --- Clipboard Banner & Paste Logic ---
+        document.getElementById('btnClearClipboard')?.addEventListener('click', () => {
+            document.getElementById('clipboardBanner').classList.add('hidden');
+            clipboard = { shifts: [], sourceViewStart: null };
+        });
+
+        document.getElementById('btnPasteClipboard')?.addEventListener('click', async () => {
+            if (!clipboard.shifts.length) return;
+
+            // Calculate offset between the copied week and the currently viewed week
+            const targetViewStart = new Date(calendar.view.activeStart);
+            const deltaMs = targetViewStart.getTime() - clipboard.sourceViewStart.getTime();
+            const deltaDays = Math.round(deltaMs / (1000 * 60 * 60 * 24));
+
+            if (deltaDays === 0) {
+                if (!confirm('You are pasting in the exact same week you copied from. This will duplicate them. Continue?')) return;
+            }
+
+            // Local format function to ensure exact Timezone match for the DB
+            const formatLocalObj = (d) => {
+                const pad = (n) => n.toString().padStart(2, '0');
+                return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:00`;
+            };
+
+            const payloadShifts = clipboard.shifts.map(s => {
+                const newStart = new Date(s.start);
+                newStart.setDate(newStart.getDate() + deltaDays);
+                const newEnd = new Date(s.end);
+                newEnd.setDate(newEnd.getDate() + deltaDays);
+
+                return {
+                    branch: s.branch,
+                    title: s.title,
+                    description: s.description,
+                    start: formatLocalObj(newStart),
+                    end: formatLocalObj(newEnd)
+                };
+            });
+
+            const btn = document.getElementById('btnPasteClipboard');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+
+            try {
+                const res = await apiFetch('/api/shifts/bulk', {
+                    method: 'POST',
+                    body: JSON.stringify({ shifts: payloadShifts })
+                });
+                alert(`Successfully pasted ${res.count} shifts!`);
+                calendar.refetchEvents();
+                
+            } catch (err) {
+                alert('Paste failed: ' + err.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = 'Paste Here';
+            }
+        });
+
+        // --- Custom Deadline Modal ---
+        const btnOpenDeadline = document.getElementById('btnOpenDeadline');
+        const dlTime    = document.getElementById('dlTime');
+        const dlPreview = document.getElementById('dlPreview');
+
+        if (btnOpenDeadline) {
+            btnOpenDeadline.addEventListener('click', () => {
+                const startIso = getLocalYYYYMMDD(calendar.view.activeStart);
+                const endIso   = getLocalYYYYMMDD(new Date(calendar.view.activeEnd.getTime() - 1));
+                document.getElementById('dlPeriodStart').value = startIso;
+                document.getElementById('dlPeriodEnd').value   = endIso;
+                dlTime.value = '';
+                dlPreview.textContent = 'لطفا یک تاریخ انتخاب کنید';
+                document.getElementById('deadlineModal').classList.remove('hidden');
+            });
+            dlTime.addEventListener('input', e => {
+                dlPreview.textContent = e.target.value ? toJalaliString(e.target.value) : 'لطفا یک تاریخ انتخاب کنید';
+            });
+            document.getElementById('btnCancelDeadline').addEventListener('click', () => {
+                document.getElementById('deadlineModal').classList.add('hidden');
+            });
+            document.getElementById('btnSaveDeadline').addEventListener('click', async () => {
+                const payload = {
+                    period_start: document.getElementById('dlPeriodStart').value,
+                    period_end:   document.getElementById('dlPeriodEnd').value,
+                    deadline:     dlTime.value
+                };
+                if (!payload.period_start || !payload.period_end || !payload.deadline) return alert('All fields are required.');
+                try {
+                    await apiFetch('/api/deadlines', { method: 'POST', body: JSON.stringify(payload) });
+                    document.getElementById('deadlineModal').classList.add('hidden');
+                    alert('Deadline successfully applied to this block!');
+                    calendar.refetchEvents();
+                } catch(err) { alert('Save failed: ' + err.message); }
+            });
+        }
+
+        // --- Ghost mode (desktop SHIFT key) ---
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Shift') document.body.classList.add('ghost-mode');
+        });
+        document.addEventListener('keyup', (e) => {
+            if (e.key === 'Shift') document.body.classList.remove('ghost-mode');
+        });
+
+        // --- Branch filter ---
+        const branchFilter = document.getElementById('branchFilter');
+        if (branchFilter) {
+            branchFilter.addEventListener('change', function() {
+                const branch = this.value;
+                if (calendar) calendar.refetchEvents();
+                loadBranchInfo(branch);
+
+                const btnST = document.getElementById('btnShiftTimes');
+                const btnAD = document.getElementById('btnAutoDraw');
+                const btnCW = document.getElementById('btnCopyWeek');
+                if (branch) {
+                    btnST.disabled = false; btnST.className = "bg-slate-100 text-slate-700 px-4 py-2 rounded-lg shadow-sm font-semibold hover:bg-slate-200 transition flex items-center cursor-pointer";
+                    btnAD.disabled = false; btnAD.className = "bg-indigo-100 text-indigo-700 border border-indigo-300 px-4 py-2 rounded-lg shadow-sm font-semibold hover:bg-indigo-200 transition flex items-center cursor-pointer";
+                    if (btnCW) { btnCW.disabled = false; btnCW.className = "bg-amber-100 text-amber-700 border border-amber-300 px-4 py-2 rounded-lg shadow-sm font-semibold hover:bg-amber-200 transition flex items-center cursor-pointer"; }
+                } else {
+                    btnST.disabled = true;  btnST.className = "bg-slate-100 text-slate-400 px-4 py-2 rounded-lg shadow-sm font-semibold transition flex items-center cursor-not-allowed border-none";
+                    btnAD.disabled = true;  btnAD.className = "bg-indigo-50 text-indigo-400 border border-indigo-200 px-4 py-2 rounded-lg shadow-sm font-semibold transition flex items-center cursor-not-allowed";
+                    if (btnCW) { btnCW.disabled = true;  btnCW.className = "bg-amber-50 text-amber-400 border border-amber-200 px-4 py-2 rounded-lg shadow-sm font-semibold transition flex items-center cursor-not-allowed"; }
+                }
+            });
+        }
+
+        // --- Auto-draw ---
+        const btnAutoDraw = document.getElementById('btnAutoDraw');
+        if (btnAutoDraw) {
+            btnAutoDraw.addEventListener('click', async () => {
+                const branch = getCurrentBranch();
+                if (!branchShiftTimes.morning_shift_start || !branchShiftTimes.evening_shift_end) {
+                    return alert("Please configure the Morning and Evening shift times first using 'Shift Times'.");
+                }
+                const startDateStr = getLocalYYYYMMDD(calendar.view.activeStart);
+                const endDateStr   = getLocalYYYYMMDD(new Date(calendar.view.activeEnd.getTime() - 1));
+                if (!confirm(`Auto-generate Drafts for ${branch}?\nThis will find the peak staff required for Morning & Evening windows and instantly draw the official shifts.`)) return;
+                btnAutoDraw.disabled = true;
+                btnAutoDraw.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Working...';
+                try {
+                    const res = await apiFetch('/api/shifts/auto_generate', { method: 'POST', body: JSON.stringify({ branch, start_date: startDateStr, end_date: endDateStr }) });
+                    alert(res.message);
+                    calendar.refetchEvents();
+                } catch (err) { alert("Error: " + err.message); }
+                btnAutoDraw.disabled = false;
+                btnAutoDraw.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles mr-2"></i> Auto-Draw Drafts';
+            });
+        }
+
+        // --- Copy Previous Week ---
+        const btnCopyWeek = document.getElementById('btnCopyWeek');
+        const copyWeekModal = document.getElementById('copyWeekModal');
+        if (btnCopyWeek && copyWeekModal) {
+            btnCopyWeek.addEventListener('click', () => {
+                const viewStart = calendar.view.activeStart;
+                const prevWeekMonday = new Date(viewStart);
+                prevWeekMonday.setDate(prevWeekMonday.getDate() - 7);
+                document.getElementById('copyFromDate').value = getLocalYYYYMMDD(prevWeekMonday);
+                copyWeekModal.classList.remove('hidden');
+            });
+            document.getElementById('btnCopyWeekCancel').addEventListener('click', () => {
+                copyWeekModal.classList.add('hidden');
+            });
+            document.getElementById('btnCopyWeekConfirm').addEventListener('click', async () => {
+                const fromDate = document.getElementById('copyFromDate').value;
+                if (!fromDate) return alert('Please select a source week.');
+                const branch = getCurrentBranch();
+                const viewStart = calendar.view.activeStart;
+                const toDate = getLocalYYYYMMDD(viewStart);
+                const btn = document.getElementById('btnCopyWeekConfirm');
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Copying...';
+                try {
+                    const res = await apiFetch('/api/shifts/copy_week', {
+                        method: 'POST',
+                        body: JSON.stringify({ branch, from_date: fromDate, to_date: toDate })
+                    });
+                    alert(res.message);
+                    calendar.refetchEvents();
+                    copyWeekModal.classList.add('hidden');
+                } catch (err) {
+                    alert('Error: ' + err.message);
+                }
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-copy mr-2"></i> Copy';
+            });
+        }
+
+        if (document.getElementById('btnApprove')) {
+            document.getElementById('btnApprove').addEventListener('click', async () => {
+                if (!confirm('Publish all Drafts?')) return;
+                await apiFetch('/api/shifts/approve_all', { method: 'POST', body: JSON.stringify({ branch: getCurrentBranch() }) });
+                calendar.refetchEvents();
+            });
+        }
+
+        document.getElementById('btnSaveShift')?.addEventListener('click', saveShift);
+        document.getElementById('btnDeleteShift')?.addEventListener('click', async () => {
+            const id = document.getElementById('shiftId').value;
+            if (confirm('Delete?')) { await apiFetch(`/api/shifts/${id}`, { method: 'DELETE' }); closeShiftModal(); calendar.refetchEvents(); }
+        });
+        document.getElementById('btnCancelShift')?.addEventListener('click', closeShiftModal);
+        document.getElementById('btnFillMorning')?.addEventListener('click', () => fillShiftTime(branchShiftTimes.morning_shift_start, branchShiftTimes.morning_shift_end));
+        document.getElementById('btnFillEvening')?.addEventListener('click', () => fillShiftTime(branchShiftTimes.evening_shift_start, branchShiftTimes.evening_shift_end));
+        document.getElementById('btnShiftTimes')?.addEventListener('click', openShiftTimesModal);
+        document.getElementById('btnSaveShiftTimes')?.addEventListener('click', saveShiftTimes);
+        document.getElementById('btnCancelShiftTimes')?.addEventListener('click', () => document.getElementById('shiftTimesModal').classList.add('hidden'));
+
+        // --- Mode toggle buttons (admin) ---
+        const btnModeDraw   = document.getElementById('btnModeDraw');
+        const btnModeAssign = document.getElementById('btnModeAssign');
+        const modeWrapper   = document.getElementById('calendar-mode-wrapper');
+        if (btnModeDraw && btnModeAssign) {
+            btnModeDraw.addEventListener('click', () => {
+                modeWrapper.classList.remove('mode-assigning');
+                modeWrapper.classList.add('mode-drawing');
+                btnModeDraw.classList.add('bg-white', 'shadow-sm', 'text-slate-800');
+                btnModeDraw.classList.remove('text-slate-500');
+                btnModeAssign.classList.remove('bg-white', 'shadow-sm', 'text-slate-800');
+                btnModeAssign.classList.add('text-slate-500');
+                calendar.changeView(isMobile ? 'timeGridDay' : 'timeGridWeek'); // Admin drawing uses grid
+            });
+            btnModeAssign.addEventListener('click', () => {
+                modeWrapper.classList.remove('mode-drawing');
+                modeWrapper.classList.add('mode-assigning');
+                btnModeAssign.classList.add('bg-white', 'shadow-sm', 'text-slate-800');
+                btnModeAssign.classList.remove('text-slate-500');
+                btnModeDraw.classList.remove('bg-white', 'shadow-sm', 'text-slate-800');
+                btnModeDraw.classList.add('text-slate-500');
+                calendar.changeView(isMobile ? 'listWeek' : 'timeGridWeek'); // Admin assigning 
+            });
+        }
+
+        // --- Full Screen Button Event Listener ---
+        const btnFullScreen = document.getElementById('btnFullScreen');
+        const wrapper = document.getElementById('calendar-mode-wrapper');
+
+        if (btnFullScreen && wrapper) {
+            btnFullScreen.addEventListener('click', () => {
+                if (!document.fullscreenElement) {
+                    wrapper.requestFullscreen().catch(err => {
+                        alert(`Error attempting to enable full-screen mode: ${err.message} (${err.name})`);
+                    });
+                } else {
+                    document.exitFullscreen();
+                }
+            });
+
+            document.addEventListener('fullscreenchange', () => {
+                const isFS = !!document.fullscreenElement;
+                wrapper.classList.toggle('fullscreen-active', isFS);
+                
+                if (isFS) {
+                    btnFullScreen.innerHTML = '<i class="fa-solid fa-compress mr-2"></i> Exit Full Screen';
+                    btnFullScreen.classList.remove('bg-slate-100', 'text-slate-700');
+                    btnFullScreen.classList.add('bg-rose-50', 'text-rose-600', 'border-rose-200');
+                } else {
+                    btnFullScreen.innerHTML = '<i class="fa-solid fa-expand mr-2"></i> Full Screen';
+                    btnFullScreen.classList.remove('bg-rose-50', 'text-rose-600', 'border-rose-200');
+                    btnFullScreen.classList.add('bg-slate-100', 'text-slate-700');
+                }
+                
+                // Force calendar repaint
+                if (calendar) {
+                    setTimeout(() => {
+                        calendar.updateSize();
+                        injectCoverageStrips();
+                    }, 150);
+                }
+            });
+        }
+
+        // --- Mobile drawer: FAB + overlay ---
+        const fab     = document.getElementById('mobileFab');
+        const overlay = document.getElementById('mobileEmployeeDrawerOverlay');
+        
+        if (fab)     fab.addEventListener('click', () => openDrawer('select_first'));
+        if (overlay) overlay.addEventListener('click', closeDrawer);
+
+        // Swipe down to close drawer
+        const drawer = document.getElementById('mobileEmployeeDrawer');
+        if (drawer) {
+            let touchStartY = 0;
+            drawer.addEventListener('touchstart', e => { touchStartY = e.touches[0].clientY; }, { passive: true });
+            drawer.addEventListener('touchend', e => {
+                const dy = e.changedTouches[0].clientY - touchStartY;
+                if (dy > 60) closeDrawer();
+            }, { passive: true });
+        }
+    }
+
+    /* =========================================================
+       INIT
+       ========================================================= */
+    document.addEventListener('DOMContentLoaded', function() {
+        initEmployeeList();
+        initCalendar();
+        initListeners();
+        {% if view_type == 'supervisor' and current_user.branch_name %}
+            loadBranchInfo('{{ current_user.branch_name }}');
+        {% endif %}
+    });
+})();
+</script>
+{% endblock %}

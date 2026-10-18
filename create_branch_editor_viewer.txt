@@ -1,0 +1,37 @@
+first enter flask shell
+
+then:
+
+from werkzeug.security import generate_password_hash
+from __main__ import db, AppAdmin
+
+# 1. Create Branch Editor User
+editor_user = AppAdmin.query.filter_by(username='branch_editor').first()
+if not editor_user:
+    editor_user = AppAdmin(
+        username='kimish', 
+        password_hash=generate_password_hash('Kanagawa_1830', method='pbkdf2:sha256'), 
+        role='branch_editor'
+    )
+    db.session.add(editor_user)
+    print("Branch Editor user created successfully.")
+else:
+    editor_user.role = 'branch_editor'
+    print("Branch Editor user already exists. Role updated.")
+
+# 2. Create Branch Viewer User
+viewer_user = AppAdmin.query.filter_by(username='branch_viewer').first()
+if not viewer_user:
+    viewer_user = AppAdmin(
+        username='planning', 
+        password_hash=generate_password_hash('stanley_arian', method='pbkdf2:sha256'), 
+        role='branch_viewer'
+    )
+    db.session.add(viewer_user)
+    print("Branch Viewer user created successfully.")
+else:
+    viewer_user.role = 'branch_viewer'
+    print("Branch Viewer user already exists. Role updated.")
+
+db.session.commit()
+exit()

@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="fa">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>پنل کاربری کارمند</title>
+    
+    <!-- Fonts & Icons -->
+    <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/vazirmatn-font-face.css" rel="stylesheet" type="text/css" />
+    
+    <!-- FullCalendar v6 CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
+
+    <style>
+        :root {
+            --amber:       #F59E0B;
+            --amber-dark:  #D97706;
+            --amber-light: #FEF3C7;
+            --navy:        #1E293B;
+            --navy-mid:    #334155;
+            --slate:       #64748B;
+            --border:      #E2E8F0;
+            --bg:          #F8FAFC;
+            --card:        #FFFFFF;
+            --green:       #10B981;
+            --radius-lg:   16px;
+            --radius-md:   12px;
+            --shadow:      0 4px 18px rgba(30, 41, 59, 0.05);
+        }
+
+        * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+
+        body {
+            font-family: 'Vazirmatn', Tahoma, sans-serif;
+            background: var(--bg);
+            color: var(--navy);
+            min-height: 100svh;
+            padding-bottom: 40px;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* ======================== HEADER ======================== */
+        .header {
+            background: var(--navy);
+            position: sticky; top: 0; z-index: 100;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            padding: 14px 16px;
+        }
+
+        .header-top {
+            display: flex; align-items: center;
+            justify-content: space-between;
+            max-width: 900px; margin: 0 auto;
+        }
+
+        .header-brand {
+            display: flex; align-items: center; gap: 12px;
+        }
+
+        .brand-icon {
+            width: 40px; height: 40px; border-radius: var(--radius-md);
+            background: linear-gradient(135deg, var(--amber), var(--amber-dark));
+            display: flex; align-items: center; justify-content: center;
+            font-size: 20px; box-shadow: 0 4px 10px rgba(245, 158, 11, 0.3);
+        }
+
+        .brand-title {
+            font-size: 16px; font-weight: 800; color: white;
+        }
+
+        .brand-sub {
+            font-size: 11px; color: var(--amber); margin-top: 1px;
+            font-weight: 600;
+        }
+
+        .logout-btn {
+            width: 38px; height: 38px; border-radius: var(--radius-md);
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.15); color: white; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 16px; text-decoration: none; transition: all 0.2s;
+        }
+        .logout-btn:active { background: rgba(255,255,255,0.2); }
+
+        /* ======================== MAIN CONTAINER ======================== */
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 16px;
+        }
+
+        /* ======================== STATS ======================== */
+        .stats-grid {
+            display: grid; grid-template-columns: 1fr 1fr;
+            gap: 12px; margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: var(--card); padding: 16px;
+            border-radius: var(--radius-lg); border: 1px solid var(--border);
+            box-shadow: var(--shadow);
+            position: relative; overflow: hidden;
+        }
+        .stat-card::after {
+            content: ''; position: absolute; top:0; right:0; width: 4px; height: 100%;
+            background: var(--amber);
+        }
+
+        .stat-val {
+            font-size: 26px; font-weight: 900; color: var(--navy);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .stat-lbl {
+            font-size: 12px; color: var(--slate); margin-top: 4px;
+            font-weight: 700;
+        }
+
+        /* ======================== TOGGLE TABS ======================== */
+        .tab-box {
+            display: flex; background: #E2E8F0; border-radius: var(--radius-md);
+            padding: 4px; margin-bottom: 20px;
+        }
+
+        .tab-btn {
+            flex: 1; border: none; background: transparent; padding: 10px;
+            font-family: inherit; font-size: 13px; font-weight: 700;
+            color: var(--navy-mid); border-radius: 8px; cursor: pointer;
+            transition: all 0.2s; display: flex; align-items: center;
+            justify-content: center; gap: 6px;
+        }
+
+        .tab-btn.active {
+            background: var(--card); color: var(--navy);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+
+        /* ======================== CALENDAR MODULE ======================== */
+        .calendar-wrap {
+            background: var(--card); border-radius: var(--radius-lg);
+            border: 1px solid var(--border); box-shadow: var(--shadow);
+            padding: 16px; margin-bottom: 20px;
+        }
+
+        /* Customizing FullCalendar Theme to match Amber/Navy */
+        .fc {
+            direction: rtl !important;
+            font-family: 'Vazirmatn', Tahoma, sans-serif !important;
+        }
+        .fc .fc-toolbar-title {
+            font-size: 15px !important; font-weight: 800 !important;
+            color: var(--navy);
+        }
+        .fc .fc-button-primary {
+            background-color: var(--navy-mid) !important;
+            border-color: var(--navy-mid) !important;
+            font-size: 12px !important;
+            font-weight: 700 !important;
+        }
+        .fc .fc-button-primary:hover {
+            background-color: var(--navy) !important;
+        }
+        .fc .fc-button-active {
+            background-color: var(--amber-dark) !important;
+            border-color: var(--amber-dark) !important;
+        }
+        .fc .fc-col-header-cell-cushion {
+            font-size: 12px !important; font-weight: 800 !important;
+            color: var(--navy-mid) !important; padding: 8px 0 !important;
+        }
+        .fc .fc-daygrid-day-number {
+            font-size: 11px !important; font-weight: 700 !important;
+            color: var(--slate) !important;
+        }
+        .fc-event {
+            border-radius: 6px !important;
+            padding: 2px 4px !important;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05) !important;
+            cursor: pointer;
+        }
+        .fc-event-title {
+            font-size: 10.5px !important;
+            font-weight: 700 !important;
+            white-space: normal !important;
+        }
+
+        /* ======================== TIMELINE SECTION ======================== */
+        .section-title {
+            font-size: 15px; font-weight: 800; color: var(--navy);
+            margin: 10px 4px 14px; display: flex; align-items: center; gap: 8px;
+        }
+        .section-title span {
+            width: 8px; height: 8px; border-radius: 50%; background: var(--amber);
+        }
+
+        .timeline-container {
+            position: relative; padding-right: 16px;
+        }
+        .timeline-container::before {
+            content: ''; position: absolute; right: 4px; top: 8px; bottom: 8px;
+            width: 2px; background: #E2E8F0;
+        }
+
+        .timeline-item {
+            position: relative; margin-bottom: 16px;
+        }
+        .timeline-marker {
+            position: absolute; right: -16px; top: 16px;
+            width: 10px; height: 10px; border-radius: 50%;
+            background: var(--amber); border: 2px solid var(--card);
+            box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.2);
+            z-index: 2;
+        }
+        .timeline-item.past .timeline-marker {
+            background: var(--slate);
+            box-shadow: none;
+        }
+
+        .shift-card {
+            background: var(--card); border-radius: var(--radius-lg);
+            border: 1px solid var(--border); box-shadow: var(--shadow);
+            padding: 16px; display: flex; justify-content: space-between;
+            align-items: center; transition: transform 0.2s;
+        }
+        .shift-card:active { transform: scale(0.98); }
+
+        .shift-info { display: flex; flex-direction: column; gap: 4px; }
+        
+        .shift-name { font-size: 14px; font-weight: 800; color: var(--navy); }
+        
+        .shift-meta { font-size: 12px; color: var(--slate); font-weight: 600; }
+
+        .shift-time {
+            font-size: 13px; color: var(--navy-mid); font-weight: 700;
+            direction: ltr; margin-top: 4px; display: inline-block;
+        }
+
+        .shift-duration {
+            background: var(--amber-light); color: var(--amber-dark);
+            padding: 6px 12px; border-radius: var(--radius-md); font-size: 12px;
+            font-weight: 800; white-space: nowrap;
+        }
+
+        .timeline-item.past .shift-card { opacity: 0.75; }
+        .timeline-item.past .shift-duration { background: #F1F5F9; color: var(--slate); }
+
+        .empty-state {
+            background: var(--card); border-radius: var(--radius-lg);
+            border: 1.5px dashed var(--border); padding: 40px 16px;
+            text-align: center; color: var(--slate); font-size: 13px;
+        }
+
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+<!-- ====================== HEADER ====================== -->
+<div class="header">
+    <div class="header-top">
+        <div class="header-brand">
+            <div class="brand-icon">☕</div>
+            <div>
+                <div class="brand-title">{{ current_user.full_name }}</div>
+                <div class="brand-sub">پنل اختصاصی کارمندان</div>
+            </div>
+        </div>
+        <a href="/logout" class="logout-btn" title="خروج">↩</a>
+    </div>
+</div>
+
+<div class="container">
+    <!-- ====================== STATS ====================== -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-val">{{ total_hours_this_week }}</div>
+            <div class="stat-lbl">ساعت کارکرد این هفته</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-val">{{ total_hours_all_time }}</div>
+            <div class="stat-lbl">مجموع کل ساعت‌ها</div>
+        </div>
+    </div>
+
+    <!-- ====================== VIEW TOGGLES ====================== -->
+    <div class="tab-box">
+        <button class="tab-btn active" id="btnCalendar" onclick="switchView('calendar')">📅 تقویم گرافیکی</button>
+        <button class="tab-btn" id="btnTimeline" onclick="switchView('timeline')">📱 نمای لیست</button>
+    </div>
+
+    <!-- ====================== CALENDAR VIEW ====================== -->
+    <div id="viewCalendar" class="calendar-wrap">
+        <div id="calendar"></div>
+    </div>
+
+    <!-- ====================== TIMELINE LIST VIEW ====================== -->
+    <div id="viewTimeline" class="hidden">
+        <!-- Upcoming Shifts -->
+        <h2 class="section-title"><span></span>شیفت‌های پیش رو</h2>
+        {% if upcoming_shifts %}
+            <div class="timeline-container">
+                {% for s in upcoming_shifts %}
+                <div class="timeline-item">
+                    <div class="timeline-marker"></div>
+                    <div class="shift-card">
+                        <div class="shift-info">
+                            <div class="shift-name">{{ s.title }}</div>
+                            <div class="shift-meta">
+                                📍 <span class="branch-lbl">{{ s.branch }}</span> | 
+                                🗓 <span class="date-lbl" data-iso="{{ s.date_str }}">{{ s.date_str }}</span>
+                            </div>
+                            <div class="shift-time">{{ s.start.strftime('%H:%M') }} تا {{ s.end.strftime('%H:%M') }}</div>
+                        </div>
+                        <div class="shift-duration">{{ s.duration }} ساعت</div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="empty-state" style="margin-bottom: 24px;">شیفت تأییدشده‌ای برای روزهای آینده ثبت نشده است.</div>
+        {% endif %}
+
+        <!-- Past Shifts -->
+        <h2 class="section-title"><span></span>شیفت‌های قبلی</h2>
+        {% if past_shifts %}
+            <div class="timeline-container">
+                {% for s in past_shifts %}
+                <div class="timeline-item past">
+                    <div class="timeline-marker"></div>
+                    <div class="shift-card">
+                        <div class="shift-info">
+                            <div class="shift-name">{{ s.title }}</div>
+                            <div class="shift-meta">
+                                📍 {{ s.branch }} | 
+                                🗓 <span class="date-lbl" data-iso="{{ s.date_str }}">{{ s.date_str }}</span>
+                            </div>
+                            <div class="shift-time">{{ s.start.strftime('%H:%M') }} تا {{ s.end.strftime('%H:%M') }}</div>
+                        </div>
+                        <div class="shift-duration">{{ s.duration }} ساعت</div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="empty-state">سابقه‌ای یافت نشد.</div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+// ===================== DATA INJECTION =====================
+const calendarEvents = [
+    {% for s in upcoming_shifts %}
+    {
+        id: 'up_{{ s.id }}',
+        title: '{{ s.title }} ({{ s.branch }})',
+        start: '{{ s.start.isoformat() }}',
+        end: '{{ s.end.isoformat() }}',
+        backgroundColor: '#1E293B',
+        borderColor: '#F59E0B',
+        textColor: '#FFFFFF'
+    },
+    {% endfor %}
+    {% for s in past_shifts %}
+    {
+        id: 'past_{{ s.id }}',
+        title: '{{ s.title }} ({{ s.branch }})',
+        start: '{{ s.start.isoformat() }}',
+        end: '{{ s.end.isoformat() }}',
+        backgroundColor: '#94A3B8',
+        borderColor: '#E2E8F0',
+        textColor: '#FFFFFF'
+    },
+    {% endfor %}
+];
+
+// ===================== INITIALIZE CALENDAR =====================
+let calendar = null;
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Jalali Date Rendering for labels
+    document.querySelectorAll('.date-lbl').forEach(el => {
+        const iso = el.getAttribute('data-iso');
+        if (iso) el.textContent = formatJalali(iso);
+    });
+
+    const calendarEl = document.getElementById('calendar');
+    calendar = new FullCalendar.Calendar(calendarEl, {
+        initialView: 'dayGridMonth',
+        locale: 'fa',
+        direction: 'rtl',
+        headerToolbar: {
+            left: 'prev,next today',
+            center: 'title',
+            right: 'dayGridMonth,timeGridWeek'
+        },
+        firstDay: 6, // Starts Saturday in Iran context
+        events: calendarEvents,
+        height: 'auto',
+        eventClick: function(info) {
+            alert(`شیفت: ${info.event.title}\nزمان: ${info.event.start.toLocaleTimeString('fa-IR', {hour: '2-digit', minute:'2-digit'})}`);
+        }
+    });
+    
+    calendar.render();
+});
+
+// ===================== VIEW TOGGLE =====================
+function switchView(viewName) {
+    const calendarView = document.getElementById('viewCalendar');
+    const timelineView = document.getElementById('viewTimeline');
+    const btnCal = document.getElementById('btnCalendar');
+    const btnTime = document.getElementById('btnTimeline');
+
+    if (viewName === 'calendar') {
+        calendarView.classList.remove('hidden');
+        timelineView.classList.add('hidden');
+        btnCal.classList.add('active');
+        btnTime.classList.remove('active');
+        // Instantly force calendar adjustment after display manipulation
+        if (calendar) {
+            calendar.updateSize();
+        }
+    } else {
+        calendarView.classList.add('hidden');
+        timelineView.classList.remove('hidden');
+        btnCal.classList.remove('active');
+        btnTime.classList.add('active');
+    }
+}
+
+// ===================== JALALI CONVERSION HELPER =====================
+function toJalali(gy, gm, gd) {
+    var g_d=[31,28,31,30,31,30,31,31,30,31,30,31];
+    var j_d=[31,31,31,31,31,31,30,30,30,30,30,29];
+    gy-=1600; gm-=1; gd-=1;
+    var g_dn=365*gy+Math.floor((gy+3)/4)-Math.floor((gy+99)/100)+Math.floor((gy+399)/400);
+    for(var i=0;i<gm;i++) g_dn+=g_d[i];
+    if(gm>1&&((gy+1600)%4==0&&((gy+1600)%100!=0||(gy+1600)%400==0))) g_dn++;
+    g_dn+=gd;
+    var j_dn=g_dn-79;
+    var j_np=Math.floor(j_dn/12053); j_dn%=12053;
+    var jy=979+33*j_np+4*Math.floor(j_dn/1461);
+    j_dn%=1461;
+    if(j_dn>=366){jy+=Math.floor((j_dn-1)/365); j_dn=(j_dn-1)%365;}
+    for(i=0;i<11&&j_dn>=j_d[i];i++) j_dn-=j_d[i];
+    return [jy, i+1, j_dn+1];
+}
+
+const J_MONTHS=['فروردین','اردیبهشت','خرداد','تیر','مرداد','شهریور','مهر','آبان','آذر','دی','بهمن','اسفند'];
+
+function formatJalali(isoStr) {
+    if (!isoStr) return '';
+    const d = new Date(isoStr + 'T12:00:00');
+    const [jy, jm, jd] = toJalali(d.getFullYear(), d.getMonth() + 1, d.getDate());
+    return `${jd} ${J_MONTHS[jm - 1]} ${jy}`;
+}
+</script>
+</body>
+</html>

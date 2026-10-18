@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#07090d">
+    <title>تماس با ما | Lamiz</title>
+    
+    <!-- Local FontAwesome for Icons -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/all.min.css') }}">
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        :root {
+            --bg: #07090d;
+            --card: rgba(15, 18, 24, 0.72);
+            --card-hover: rgba(20, 24, 32, 0.85);
+            --border: rgba(255,255,255,0.08);
+            --border-hover: rgba(214,168,95,0.3);
+            --gold: #d6a85f;
+            --gold-soft: #f1d4a4;
+            --gold-dim: rgba(214,168,95,0.15);
+            --text: #f5f7fa;
+            --muted: #98a2b3;
+            --muted-dark: #6b7280;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100dvh;
+            overflow-x: hidden;
+            position: relative;
+            padding-top: 0;
+        }
+
+        /* ===== AMBIENT MESH + DYNAMIC NOISE ===== */
+        .ambient-bg {
+            position: fixed;
+            inset: 0;
+            overflow: hidden;
+            z-index: -2;
+            background: radial-gradient(circle at 20% 20%, rgba(214,168,95,0.12), transparent 30%),
+                        radial-gradient(circle at 80% 30%, rgba(214,168,95,0.08), transparent 35%),
+                        radial-gradient(circle at 50% 80%, rgba(255,255,255,0.04), transparent 30%),
+                        #07090d;
+        }
+
+        .ambient-bg::before,
+        .ambient-bg::after {
+            content: '';
+            position: absolute;
+            width: 60vw;
+            height: 60vw;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(214,168,95,0.08), transparent 70%);
+            filter: blur(40px);
+            animation: drift 18s infinite alternate ease-in-out;
+        }
+
+        .ambient-bg::before {
+            top: -10%;
+            left: -10%;
+        }
+
+        .ambient-bg::after {
+            bottom: -20%;
+            right: -10%;
+            animation-duration: 24s;
+        }
+
+        @keyframes drift {
+            from { transform: translate3d(0,0,0) scale(1); }
+            to { transform: translate3d(40px,-30px,0) scale(1.12); }
+        }
+
+        .noise {
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            opacity: 0.04;
+            background-image: radial-gradient(#fff 0.8px, transparent 0.8px);
+            background-size: 8px 8px;
+            pointer-events: none;
+        }
+
+        /* ===== NAVBAR ===== */
+        .premium-navbar {
+            position: fixed;
+            top: 15px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 95%;
+            max-width: 1400px;
+            background: rgba(15, 18, 24, 0.75);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 24px;
+            z-index: 1000;
+            padding: 0.5rem 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            transition: all 0.4s ease;
+        }
+
+        .navbar-brand {
+            font-size: 1.3rem;
+            font-weight: 800;
+            color: var(--text);
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            letter-spacing: -0.02em;
+        }
+
+        .navbar-brand img {
+            width: 36px;
+            height: auto;
+            filter: drop-shadow(0 0 12px rgba(214,168,95,0.3));
+        }
+
+        .navbar-brand span {
+            color: var(--gold);
+            text-shadow: 0 0 16px rgba(214,168,95,0.4);
+        }
+
+        .nav-menu ul {
+            display: flex;
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            align-items: center;
+            gap: 1.2rem;
+        }
+
+        .nav-menu a {
+            color: var(--muted);
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.9rem;
+            transition: all 0.3s ease;
+            position: relative;
+            padding: 0.4rem 0;
+        }
+
+        .nav-menu a:not(.btn):hover {
+            color: var(--gold);
+        }
+
+        .nav-menu a:not(.btn)::after {
+            content: '';
+            position: absolute;
+            bottom: -2px; right: 0;
+            width: 0; height: 2px;
+            background: var(--gold);
+            transition: width 0.3s ease;
+            border-radius: 2px;
+        }
+
+        .nav-menu a:not(.btn):hover::after { width: 100%; }
+
+        .nav-btn {
+            background: linear-gradient(135deg, var(--gold), #c8984d) !important;
+            color: #0f111a !important;
+            border: none !important;
+            border-radius: 14px !important;
+            padding: 0.6rem 1.2rem !important;
+            font-weight: 700 !important;
+            box-shadow: 0 4px 15px rgba(214,168,95,0.25) !important;
+            transition: transform 0.2s, box-shadow 0.2s !important;
+        }
+
+        .nav-btn:hover {
+            transform: translateY(-2px) scale(1.02) !important;
+            box-shadow: 0 8px 25px rgba(214,168,95,0.35) !important;
+        }
+
+        .mobile-menu-toggle {
+            display: none;
+            background: transparent;
+            border: none;
+            color: var(--text);
+            font-size: 1.5rem;
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+
+        .mobile-menu-toggle:hover { color: var(--gold); }
+
+        @media (max-width: 992px) {
+            .mobile-menu-toggle { display: block; }
+            .nav-menu {
+                position: absolute;
+                top: 100%; left: 0; right: 0;
+                background: rgba(15, 18, 24, 0.95);
+                backdrop-filter: blur(20px);
+                padding: 1.5rem;
+                border-radius: 20px;
+                border: 1px solid rgba(255,255,255,0.05);
+                transform: translateY(10px);
+                opacity: 0; visibility: hidden;
+                transition: all 0.3s ease;
+                box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+            }
+            .nav-menu.active {
+                transform: translateY(15px);
+                opacity: 1; visibility: visible;
+            }
+            .nav-menu ul { flex-direction: column; gap: 1rem; }
+            .nav-menu a { display: block; width: 100%; text-align: center; padding: 0.5rem 0; }
+            .nav-menu a:not(.btn):hover { background: rgba(255,255,255,0.03); border-radius: 8px; }
+            .nav-menu a:not(.btn)::after { display: none; }
+            .nav-btn { width: 100%; text-align: center; }
+        }
+
+        /* ===== HERO SECTION ===== */
+        .contact-hero {
+            text-align: center;
+            padding: 8rem 1rem 3rem;
+            position: relative;
+        }
+
+        .contact-hero .hero-icon {
+            width: 90px;
+            height: 90px;
+            border-radius: 32px;
+            background: linear-gradient(135deg, rgba(214,168,95,0.15), rgba(255,255,255,0.02));
+            border: 1px solid rgba(214,168,95,0.25);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 0 30px rgba(214,168,95,0.15);
+            animation: float 4s ease-in-out infinite;
+        }
+
+        .contact-hero .hero-icon i {
+            font-size: 2.5rem;
+            color: var(--gold);
+            filter: drop-shadow(0 0 12px rgba(214,168,95,0.5));
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-12px); }
+        }
+
+        .contact-hero h1 {
+            font-size: 2.8rem;
+            font-weight: 800;
+            margin-bottom: 1rem;
+            background: linear-gradient(135deg, #fff, var(--gold-soft));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -0.02em;
+        }
+
+        .contact-hero p {
+            font-size: 1.1rem;
+            color: var(--muted);
+            max-width: 550px;
+            margin: 0 auto;
+            line-height: 1.8;
+        }
+
+        /* ===== SECTION HEADERS ===== */
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin: 3rem 0 2rem;
+            padding: 0 1rem;
+        }
+
+        .section-header .section-icon {
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(135deg, rgba(214,168,95,0.2), rgba(255,255,255,0.02));
+            border: 1px solid rgba(214,168,95,0.25);
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--gold);
+            font-size: 1.3rem;
+            box-shadow: 0 4px 20px rgba(214,168,95,0.15);
+        }
+
+        .section-header h2 {
+            font-size: 1.6rem;
+            font-weight: 800;
+            margin: 0;
+            color: var(--text);
+        }
+
+        .section-header .section-subtitle {
+            font-size: 0.85rem;
+            color: var(--muted);
+            margin-top: 0.2rem;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+        }
+
+        /* ===== TEAM CARDS GRID ===== */
+        .team-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+            gap: 1.5rem;
+            padding: 0 1rem;
+            margin-bottom: 3rem;
+        }
+
+        /* ===== TEAM CARD ===== */
+        .team-card {
+            background: var(--card);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--border);
+            border-radius: 28px;
+            padding: 2.2rem;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            box-shadow: 0 8px 30px rgba(0,0,0,0.3);
+        }
+
+        .team-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--gold), rgba(214,168,95,0.3));
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .team-card:hover {
+            transform: translateY(-8px) scale(1.02);
+            border-color: var(--border-hover);
+            box-shadow: 0 20px 50px rgba(0,0,0,0.4), 0 0 30px rgba(214,168,95,0.08);
+        }
+
+        .team-card:hover::before {
+            opacity: 1;
+        }
+
+        .team-card .card-glow {
+            position: absolute;
+            top: -50%;
+            right: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(214,168,95,0.06) 0%, transparent 60%);
+            opacity: 0;
+            transition: opacity 0.4s;
+            pointer-events: none;
+        }
+
+        .team-card:hover .card-glow {
+            opacity: 1;
+        }
+
+        /* Avatar */
+        .team-card .avatar {
+            width: 72px;
+            height: 72px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, rgba(214,168,95,0.2), rgba(255,255,255,0.02));
+            border: 2px solid rgba(214,168,95,0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--gold);
+            font-size: 1.8rem;
+            font-weight: 800;
+            margin-bottom: 1.2rem;
+            box-shadow: 0 4px 20px rgba(214,168,95,0.15);
+            position: relative;
+            z-index: 1;
+            transition: all 0.3s;
+        }
+
+        .team-card:hover .avatar {
+            box-shadow: 0 8px 30px rgba(214,168,95,0.25);
+            border-color: rgba(214,168,95,0.5);
+        }
+
+        .team-card .avatar img {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            object-fit: cover;
+        }
+
+        /* Card Content */
+        .team-card .name-fa {
+            font-size: 1.25rem;
+            font-weight: 800;
+            color: var(--text);
+            margin-bottom: 0.3rem;
+            position: relative;
+            z-index: 1;
+        }
+
+        .team-card .name-en {
+            font-size: 0.85rem;
+            color: var(--muted);
+            font-weight: 500;
+            margin-bottom: 0.8rem;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            direction: ltr;
+            text-align: right;
+            position: relative;
+            z-index: 1;
+        }
+
+        .team-card .role-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: rgba(214,168,95,0.1);
+            color: var(--gold-soft);
+            padding: 0.4rem 1rem;
+            border-radius: 100px;
+            font-size: 0.82rem;
+            font-weight: 700;
+            margin-bottom: 0.6rem;
+            position: relative;
+            z-index: 1;
+            border: 1px solid rgba(214,168,95,0.15);
+        }
+
+        .team-card .role-en {
+            font-size: 0.78rem;
+            color: var(--muted-dark);
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            direction: ltr;
+            text-align: right;
+            margin-bottom: 1rem;
+            position: relative;
+            z-index: 1;
+        }
+
+        .team-card .email-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--gold);
+            text-decoration: none;
+            font-size: 0.88rem;
+            font-weight: 600;
+            transition: all 0.3s;
+            position: relative;
+            z-index: 1;
+        }
+
+        .team-card .email-link:hover {
+            gap: 0.8rem;
+            text-shadow: 0 0 12px rgba(214,168,95,0.3);
+        }
+
+        .team-card .card-actions {
+            display: flex;
+            gap: 0.6rem;
+            margin-top: 1.2rem;
+            position: relative;
+            z-index: 1;
+        }
+
+        .team-card .action-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.08);
+            background: rgba(255,255,255,0.03);
+            color: var(--muted);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 1rem;
+            text-decoration: none;
+        }
+
+        .team-card .action-btn:hover {
+            background: var(--gold);
+            color: #0f111a;
+            border-color: var(--gold);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(214,168,95,0.3);
+        }
+
+        /* ===== CONTACT BANNER ===== */
+        .contact-banner {
+            background: linear-gradient(135deg, rgba(214,168,95,0.15), rgba(214,168,95,0.05));
+            border: 1px solid rgba(214,168,95,0.2);
+            border-radius: 32px;
+            padding: 3.5rem 2rem;
+            margin: 3rem 1rem;
+            text-align: center;
+            color: var(--text);
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.03);
+        }
+
+        .contact-banner::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(214,168,95,0.08) 0%, transparent 60%);
+            animation: rotate 25s linear infinite;
+        }
+
+        @keyframes rotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .contact-banner h2 {
+            font-size: 1.8rem;
+            font-weight: 800;
+            margin-bottom: 1rem;
+            position: relative;
+            z-index: 1;
+            background: linear-gradient(135deg, #fff, var(--gold-soft));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .contact-banner p {
+            font-size: 1rem;
+            color: var(--muted);
+            max-width: 500px;
+            margin: 0 auto 1.5rem;
+            position: relative;
+            z-index: 1;
+            line-height: 1.7;
+        }
+
+        .contact-banner .banner-email {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.8rem;
+            background: rgba(214,168,95,0.15);
+            backdrop-filter: blur(10px);
+            padding: 0.9rem 2.2rem;
+            border-radius: 100px;
+            color: var(--gold-soft);
+            text-decoration: none;
+            font-weight: 700;
+            font-size: 1.05rem;
+            transition: all 0.3s;
+            position: relative;
+            z-index: 1;
+            border: 1px solid rgba(214,168,95,0.25);
+            box-shadow: 0 4px 15px rgba(214,168,95,0.1);
+        }
+
+        .contact-banner .banner-email:hover {
+            background: rgba(214,168,95,0.25);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(214,168,95,0.2);
+            color: #fff;
+        }
+
+        /* ===== FOOTER ===== */
+        footer {
+            margin-top: 5rem;
+            padding: 2.5rem 2rem;
+            text-align: center;
+            border-top: 1px solid rgba(255,255,255,0.05);
+            color: var(--muted);
+            position: relative;
+            z-index: 1;
+        }
+
+        footer .footer-brand {
+            font-weight: 800;
+            font-size: 1.1rem;
+            color: var(--text);
+            margin-bottom: 0.5rem;
+        }
+
+        footer .footer-brand span {
+            color: var(--gold);
+        }
+
+        footer small {
+            display: block;
+            opacity: 0.7;
+            margin-top: 0.3rem;
+            font-size: 0.75rem;
+        }
+
+        footer a {
+            color: var(--gold);
+            text-decoration: none;
+            transition: opacity 0.2s;
+        }
+
+        footer a:hover { opacity: 0.8; }
+
+        /* ===== TOAST NOTIFICATION ===== */
+        .toast {
+            position: fixed;
+            bottom: 2rem;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: var(--card);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(214,168,95,0.2);
+            border-radius: 16px;
+            padding: 1rem 2rem;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+            display: flex;
+            align-items: center;
+            gap: 0.8rem;
+            font-weight: 600;
+            color: var(--text);
+            z-index: 9999;
+            opacity: 0;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        .toast i {
+            color: var(--gold);
+            font-size: 1.2rem;
+        }
+
+        /* ===== RESPONSIVE ===== */
+        @media (max-width: 768px) {
+            .contact-hero { padding-top: 7rem; }
+            .contact-hero h1 { font-size: 2rem; }
+            .contact-hero p { font-size: 0.95rem; }
+            .team-grid { grid-template-columns: 1fr; }
+            .section-header h2 { font-size: 1.3rem; }
+            .contact-banner { padding: 2.5rem 1.5rem; }
+            .contact-banner h2 { font-size: 1.4rem; }
+        }
+
+        /* ===== SCROLLBAR ===== */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: var(--bg);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(214,168,95,0.2);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(214,168,95,0.35);
+        }
+    </style>
+</head>
+<body>
+    <!-- AMBIENT BACKGROUNDS -->
+    <div class="ambient-bg"></div>
+    <div class="noise"></div>
+
+    <!-- NAVBAR -->
+    <header class="premium-navbar">
+        <a href="{{ url_for('login') }}" class="navbar-brand">
+            <img src="https://cdn.barista.ir/Lamiz.png" alt="Lamiz">
+            <span>LAMIZ</span>
+        </a>
+
+        <button class="mobile-menu-toggle" aria-label="Toggle navigation">
+            <i class="fa-solid fa-bars-staggered"></i>
+        </button>
+
+        <nav class="nav-menu">
+            <ul>
+                <li><a href="{{ url_for('login') }}"><i class="fa-solid fa-house" style="margin-left: 6px;"></i> خانه</a></li>
+                {% if current_user.is_authenticated %}
+                    <li><a href="{{ url_for('profile') }}"><i class="fa-regular fa-user" style="margin-left: 6px;"></i> پروفایل</a></li>
+                    <li><a href="{{ url_for('meetings') }}"><i class="fa-solid fa-video" style="margin-left: 6px;"></i> جلسات</a></li>
+                    
+                    {% if current_user.role == 'admin' %}
+                        <li><a href="{{ url_for('admin_dashboard') }}"><i class="fa-solid fa-shield-halved" style="margin-left: 6px;"></i> مدیریت</a></li>
+                    {% else %}
+                        <li><a href="{{ url_for('courses_list') }}"><i class="fa-solid fa-graduation-cap" style="margin-left: 6px;"></i> دوره‌ها</a></li>
+                    {% endif %}
+                    
+                    {% if current_user.role in ['admin', 'content_creator'] %}
+                        <li><a href="{{ url_for('create_post') }}" class="btn nav-btn"><i class="fa-solid fa-plus"></i> پست جدید</a></li>
+                    {% endif %}
+                    <li><a href="{{ url_for('logout') }}" style="color: #ef4444;"><i class="fa-solid fa-power-off" style="margin-left: 6px;"></i> خروج</a></li>
+                {% else %}
+                    <li><a href="{{ url_for('login') }}" class="btn nav-btn">ورود / ثبت نام</a></li>
+                {% endif %}
+            </ul>
+        </nav>
+    </header>
+
+    <main class="container" style="max-width: 1400px; position: relative; z-index: 1; margin: 0 auto;">
+        
+        <!-- Hero Section -->
+        <section class="contact-hero">
+            <div class="hero-icon">
+                <i class="fa-solid fa-handshake"></i>
+            </div>
+            <h1>تماس با ما</h1>
+            <p>تیم ما در دو بخش منابع انسانی و تحقیق و توسعه، آماده پاسخگویی و همکاری با شما عزیزان هستند.</p>
+        </section>
+
+        <!-- HR Section -->
+        <div class="section-header">
+            <div class="section-icon">
+                <i class="fa-solid fa-users-gear"></i>
+            </div>
+            <div>
+                <h2>بخش منابع انسانی</h2>
+                <div class="section-subtitle">Human Resources Department</div>
+            </div>
+        </div>
+
+        <div class="team-grid">
+            <!-- Miad Zarin -->
+            <div class="team-card">
+                <div class="card-glow"></div>
+                <div class="avatar">م</div>
+                <div class="name-fa">میعاد زرین</div>
+                <div class="name-en">Miad Zarin</div>
+                <div class="role-badge">
+                    <i class="fa-solid fa-user-tie"></i>
+                    سرپرست منابع انسانی میدانی
+                </div>
+                <div class="role-en">Field Human Resources Supervisor</div>
+                <div class="card-actions">
+                    <button class="action-btn" onclick="copyEmail('')" title="کپی ایمیل">
+                        <i class="fa-regular fa-copy"></i>
+                    </button>
+                    <a href="mailto:" class="action-btn" title="ارسال ایمیل">
+                        <i class="fa-regular fa-envelope"></i>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Kimia Ghassemi -->
+            <div class="team-card">
+                <div class="card-glow"></div>
+                <div class="avatar">ک</div>
+                <div class="name-fa">کیمیا قاسمی</div>
+                <div class="name-en">Kimia Ghassemi</div>
+                <div class="role-badge">
+                    <i class="fa-solid fa-user-group"></i>
+                    کارشناس منابع انسانی
+                </div>
+                <div class="role-en">Human Resources Specialist</div>
+                <div class="card-actions">
+                    <button class="action-btn" onclick="copyEmail('')" title="کپی ایمیل">
+                        <i class="fa-regular fa-copy"></i>
+                    </button>
+                    <a href="mailto:" class="action-btn" title="ارسال ایمیل">
+                        <i class="fa-regular fa-envelope"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- R&D Section -->
+        <div class="section-header">
+            <div class="section-icon">
+                <i class="fa-solid fa-flask"></i>
+            </div>
+            <div>
+                <h2>بخش تحقیق و توسعه</h2>
+                <div class="section-subtitle">Research & Development</div>
+            </div>
+        </div>
+
+        <div class="team-grid">
+            <!-- Ashkan Yaghubi -->
+            <div class="team-card">
+                <div class="card-glow"></div>
+                <div class="avatar">ا</div>
+                <div class="name-fa">اشکان یعقوبی</div>
+                <div class="name-en">Ashkan Yaghubi</div>
+                <div class="role-badge">
+                    <i class="fa-solid fa-microscope"></i>
+                    کارشناس برنامه‌ریزی و هد تحقیق و توسعه فناوری
+                </div>
+                <div class="role-en">Head of R&D and Planning Specialist</div>
+                <a href="mailto:yaghubiashkan@gmail.com" class="email-link">
+                    <i class="fa-regular fa-envelope"></i>
+                    yaghubiashkan@gmail.com
+                </a>
+                <div class="card-actions">
+                    <button class="action-btn" onclick="copyEmail('yaghubiashkan@gmail.com')" title="کپی ایمیل">
+                        <i class="fa-regular fa-copy"></i>
+                    </button>
+                    <a href="mailto:yaghubiashkan@gmail.com" class="action-btn" title="ارسال ایمیل">
+                        <i class="fa-regular fa-envelope"></i>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Arian Azadian Nasab -->
+            <div class="team-card">
+                <div class="card-glow"></div>
+                <div class="avatar">آ</div>
+                <div class="name-fa">آرین آزادیان نسب</div>
+                <div class="name-en">Arian Azadian Nasab</div>
+                <div class="role-badge">
+                    <i class="fa-solid fa-atom"></i>
+                    متخصص تحقیق و توسعه فناوری و کارشناس برنامه‌ریزی
+                </div>
+                <div class="role-en">R&D Expert and Planning Specialist</div>
+                <div class="card-actions">
+                    <button class="action-btn" onclick="copyEmail('')" title="کپی ایمیل">
+                        <i class="fa-regular fa-copy"></i>
+                    </button>
+                    <a href="mailto:" class="action-btn" title="ارسال ایمیل">
+                        <i class="fa-regular fa-envelope"></i>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Mohammad Dakhili -->
+            <div class="team-card">
+                <div class="card-glow"></div>
+                <div class="avatar">م</div>
+                <div class="name-fa">محمد دخیلی</div>
+                <div class="name-en">Mohammad Dakhili</div>
+                <div class="role-badge">
+                    <i class="fa-solid fa-lightbulb"></i>
+                    کارشناس برنامه‌ریزی و کارشناس تحقیق و توسعه فناوری
+                </div>
+                <div class="role-en">R&D and Planning Specialist</div>
+                <div class="card-actions">
+                    <button class="action-btn" onclick="copyEmail('')" title="کپی ایمیل">
+                        <i class="fa-regular fa-copy"></i>
+                    </button>
+                    <a href="mailto:" class="action-btn" title="ارسال ایمیل">
+                        <i class="fa-regular fa-envelope"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Contact Banner -->
+        <section class="contact-banner">
+            <h2><i class="fa-solid fa-paper-plane" style="margin-left: 10px;"></i> با ما در ارتباط باشید</h2>
+            <p>برای هرگونه سوال، پیشنهاد یا درخواست همکاری، می‌توانید از طریق ایمیل اصلی پلتفرم با ما تماس بگیرید.</p>
+            <a href="mailto:yaghubiashkan@gmail.com" class="banner-email">
+                <i class="fa-regular fa-envelope"></i>
+                yaghubiashkan@gmail.com
+            </a>
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer>
+        <div class="footer-brand">پلتفرم آموزشی حرفه‌ای <span>لمیز</span> &copy; 2025</div>
+        <small>طراحی شده با ❤️ برای یادگیری بهتر و عمیق‌تر</small>
+        <small>Produced by Lamiz R&D Team. <a href="https://barista.ir/contact">Click Here!</a></small>
+    </footer>
+
+    <!-- Toast Notification -->
+    <div class="toast" id="toast">
+        <i class="fa-solid fa-circle-check"></i>
+        <span id="toast-message">ایمیل کپی شد!</span>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Mobile Menu Toggle
+            const toggleBtn = document.querySelector('.mobile-menu-toggle');
+            const navMenu = document.querySelector('.nav-menu');
+            
+            if(toggleBtn) {
+                toggleBtn.addEventListener('click', function() {
+                    navMenu.classList.toggle('active');
+                    const icon = toggleBtn.querySelector('i');
+                    if (navMenu.classList.contains('active')) {
+                        icon.className = 'fa-solid fa-xmark';
+                    } else {
+                        icon.className = 'fa-solid fa-bars-staggered';
+                    }
+                });
+            }
+        });
+
+        // Copy Email Function
+        function copyEmail(email) {
+            navigator.clipboard.writeText(email).then(() => {
+                showToast('ایمیل کپی شد: ' + email);
+            }).catch(() => {
+                const textArea = document.createElement('textarea');
+                textArea.value = email;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                showToast('ایمیل کپی شد: ' + email);
+            });
+        }
+
+        // Show Toast
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            const toastMessage = document.getElementById('toast-message');
+            toastMessage.textContent = message;
+            toast.classList.add('show');
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+    </script>
+</body>
+</html>

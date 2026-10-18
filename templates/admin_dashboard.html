@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="max-w-3xl mx-auto mt-10">
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-8">
+        <h2 class="text-2xl font-bold text-slate-800 mb-2">Generate New Schedule</h2>
+        <p class="text-slate-500 mb-8">Select a date range. The system will automatically calculate man-hours based on historical invoices from the past 2 weeks.</p>
+
+        <form method="POST" class="space-y-6">
+            <div class="grid grid-cols-2 gap-6">
+                <div>
+                    <label class="block text-sm font-semibold text-slate-700 mb-2">Start Date</label>
+                    <input type="date" name="start_date" required class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-slate-700 mb-2">End Date</label>
+                    <input type="date" name="end_date" required class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500 focus:outline-none">
+                </div>
+            </div>
+            <button type="submit" class="w-full bg-amber-500 text-white font-bold py-4 rounded-lg hover:bg-amber-600 transition shadow-lg shadow-amber-500/30 flex justify-center items-center">
+                <i class="fa-solid fa-calculator mr-2"></i> Calculate & Draft Schedule
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}

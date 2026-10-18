@@ -1,0 +1,635 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Lamiz Workforce</title>
+
+    <script src="{{ url_for('static', filename='js/tailwind.js') }}"></script>
+
+    <!-- Preload Logo -->
+    <link rel="preload" as="image" href="https://cdn.barista.ir/Lamiz.png">
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        :root {
+            --bg: #07090d;
+            --card: rgba(15, 18, 24, 0.72);
+            --border: rgba(255,255,255,0.08);
+            --gold: #d6a85f;
+            --gold-soft: #f1d4a4;
+            --text: #f5f7fa;
+            --muted: #98a2b3;
+        }
+
+        body {
+            font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100dvh;
+            overflow: hidden;
+            position: relative;
+            display: block;
+        }
+
+        /* Animated Mesh Background */
+        .ambient-bg {
+            position: fixed;
+            inset: 0;
+            overflow: hidden;
+            z-index: -2;
+            background:
+                radial-gradient(circle at 20% 20%, rgba(214,168,95,0.12), transparent 30%),
+                radial-gradient(circle at 80% 30%, rgba(214,168,95,0.08), transparent 35%),
+                radial-gradient(circle at 50% 80%, rgba(255,255,255,0.04), transparent 30%),
+                #07090d;
+        }
+
+        .ambient-bg::before,
+        .ambient-bg::after {
+            content: '';
+            position: absolute;
+            width: 60vw;
+            height: 60vw;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(214,168,95,0.08), transparent 70%);
+            filter: blur(40px);
+            animation: drift 18s infinite alternate ease-in-out;
+        }
+
+        .ambient-bg::before {
+            top: -10%;
+            left: -10%;
+        }
+
+        .ambient-bg::after {
+            bottom: -20%;
+            right: -10%;
+            animation-duration: 24s;
+        }
+
+        @keyframes drift {
+            from {
+                transform: translate3d(0,0,0) scale(1);
+            }
+            to {
+                transform: translate3d(40px,-30px,0) scale(1.12);
+            }
+        }
+
+        /* Noise Texture */
+        .noise {
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            opacity: 0.03;
+            background-image:
+                radial-gradient(#fff 0.5px, transparent 0.5px);
+            background-size: 6px 6px;
+            pointer-events: none;
+        }
+
+        /* Splash */
+        .splash {
+            position: fixed;
+            inset: 0;
+            background: #07090d;
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.6s ease, visibility 0.6s ease;
+        }
+
+        .splash.hidden {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+
+        .splash-logo {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 24px;
+            animation: splashReveal 1.8s cubic-bezier(0.19, 1, 0.22, 1);
+        }
+
+        .splash-logo img {
+            width: 140px;
+            height: auto;
+            filter:
+                drop-shadow(0 0 40px rgba(214,168,95,0.28))
+                drop-shadow(0 0 80px rgba(214,168,95,0.14));
+        }
+
+        .splash-title {
+            font-size: 1.2rem;
+            letter-spacing: 0.28em;
+            text-transform: uppercase;
+            color: var(--gold-soft);
+            font-weight: 500;
+        }
+
+        .splash-subtitle {
+            color: rgba(255,255,255,0.5);
+            font-size: 0.85rem;
+            letter-spacing: 0.12em;
+        }
+
+        @keyframes splashReveal {
+            from {
+                opacity: 0;
+                transform: scale(0.92) translateY(10px);
+                filter: blur(10px);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+                filter: blur(0);
+            }
+        }
+
+        /* Branch Constellation Canvas */
+        .constellation {
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            opacity: 0.55;
+            pointer-events: none;
+        }
+            to {
+                opacity: 1;
+                transform: scale(1);
+                filter: blur(0);
+            }
+        }
+
+        /* Layout */
+        .wrapper {
+    min-height: 100dvh;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    z-index: 10;
+}
+
+        .login-card {
+            width: 100%;
+            max-width: 420px;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 32px;
+            backdrop-filter: blur(10px);
+            padding: 42px 34px;
+            box-shadow:
+                0 10px 40px rgba(0,0,0,0.35),
+                inset 0 1px 0 rgba(255,255,255,0.04);
+            animation: cardEnter 0.7s ease;
+        }
+
+        @keyframes cardEnter {
+            from {
+                opacity: 0;
+                transform: translateY(18px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Logo */
+        .brand {
+            text-align: center;
+            margin-bottom: 34px;
+        }
+
+        .brand-mark {
+            width: 110px;
+            height: 110px;
+            margin: 0 auto 22px;
+            border-radius: 34px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background:
+                linear-gradient(145deg,
+                rgba(214,168,95,0.14),
+                rgba(255,255,255,0.03));
+            border: 1px solid rgba(214,168,95,0.16);
+            box-shadow:
+                0 0 60px rgba(214,168,95,0.08),
+                inset 0 1px 0 rgba(255,255,255,0.04);
+        }
+
+        .brand-mark img {
+            width: 68px;
+            height: auto;
+            filter: drop-shadow(0 0 22px rgba(214,168,95,0.18));
+        }
+
+        .brand h1 {
+            font-size: 1.8rem;
+            font-weight: 600;
+            letter-spacing: -0.04em;
+            margin-bottom: 8px;
+        }
+
+        .brand p {
+            color: var(--muted);
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+
+        /* Form */
+        .form-group {
+            margin-bottom: 18px;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 0.78rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #c5ccd8;
+            font-weight: 600;
+        }
+
+        .form-input {
+            width: 100%;
+            height: 56px;
+            border-radius: 16px;
+            border: 1px solid rgba(255,255,255,0.08);
+            background: rgba(255,255,255,0.03);
+            padding: 0 18px;
+            color: white;
+            font-size: 0.96rem;
+            transition:
+                border-color 0.25s ease,
+                background 0.25s ease,
+                box-shadow 0.25s ease;
+        }
+
+        .form-input::placeholder {
+            color: #7d8697;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: rgba(214,168,95,0.55);
+            background: rgba(255,255,255,0.05);
+            box-shadow: 0 0 0 4px rgba(214,168,95,0.08);
+        }
+
+        /* Button */
+        .login-btn {
+            width: 100%;
+            height: 58px;
+            border: none;
+            border-radius: 18px;
+            margin-top: 8px;
+            background:
+                linear-gradient(135deg,
+                #c8984d,
+                #e0ba79);
+            color: #111318;
+            font-size: 0.96rem;
+            font-weight: 700;
+            letter-spacing: 0.01em;
+            cursor: pointer;
+            transition:
+                transform 0.2s ease,
+                box-shadow 0.25s ease,
+                opacity 0.25s ease;
+            box-shadow:
+                0 10px 25px rgba(214,168,95,0.16);
+        }
+
+        .login-btn:hover {
+            transform: translateY(-1px);
+            box-shadow:
+                0 14px 30px rgba(214,168,95,0.22);
+        }
+
+        .login-btn:active {
+            transform: scale(0.985);
+        }
+
+        /* Alerts */
+        .alert {
+            margin-bottom: 18px;
+            border-radius: 16px;
+            padding: 14px 16px;
+            font-size: 0.9rem;
+            border: 1px solid rgba(255,120,120,0.2);
+            background: rgba(255,80,80,0.08);
+            color: #ffb2b2;
+        }
+
+        .alert.info {
+            border-color: rgba(120,255,160,0.18);
+            background: rgba(80,255,120,0.08);
+            color: #c7ffd5;
+        }
+
+        /* Footer */
+        .footer {
+            margin-top: 26px;
+            text-align: center;
+            color: #727b8c;
+            font-size: 0.75rem;
+        }
+
+        @media (max-width: 520px) {
+            .login-card {
+                padding: 36px 22px;
+                border-radius: 28px;
+            }
+
+            .brand-mark {
+                width: 74px;
+                height: 74px;
+            }
+
+            .brand-mark span {
+                font-size: 3rem;
+            }
+
+            .brand h1 {
+                font-size: 1.55rem;
+            }
+        }
+
+
+        
+
+        .iran-network {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.32;
+    pointer-events: none;
+}
+
+.iran-map {
+    width: min(85vw, 900px);
+    height: auto;
+    filter:
+        drop-shadow(0 0 50px rgba(214,168,95,0.08));
+}
+
+.iran-shape {
+    fill: rgba(255,255,255,0.015);
+    stroke: rgba(214,168,95,0.12);
+    stroke-width: 2;
+}
+
+.branch-node {
+    fill: #e0ba79;
+    filter: drop-shadow(0 0 8px rgba(214,168,95,0.9));
+    animation: pulseNode 3s infinite ease-in-out;
+}
+
+.branch-line {
+    stroke: rgba(214,168,95,0.12);
+    stroke-width: 1.4;
+}
+
+.data-flow {
+    fill: #f7d39d;
+    filter: drop-shadow(0 0 8px rgba(255,230,180,0.9));
+}
+
+@keyframes pulseNode {
+    0%, 100% {
+        r: 4;
+        opacity: 0.65;
+    }
+
+    50% {
+        r: 6;
+        opacity: 1;
+    }
+}
+    </style>
+</head>
+<body>
+
+    <!-- Splash -->
+    <div class="splash" id="splash">
+        <div class="splash-logo">
+            <img src="https://cdn.barista.ir/Lamiz.png" alt="Lamiz">
+            <div class="splash-title">LAMIZ</div>
+            <div class="splash-subtitle">You are going to feel better soon!</div>
+        </div>
+    </div>
+    </div>
+
+    <div class="ambient-bg"></div>
+    <!-- IRAN NETWORK MAP -->
+<div class="iran-network">
+
+    <!-- Iran SVG -->
+    <svg class="iran-map" viewBox="0 0 1000 1000">
+
+        <!-- Simplified Iran Shape -->
+        <path
+            d="M230,180 L340,120 L510,130 L650,180 L760,260
+               L820,410 L760,620 L620,760 L420,830
+               L250,760 L160,620 L130,470 L170,300 Z"
+            class="iran-shape"
+        />
+
+        <!-- CONNECTION LINES -->
+        <g id="networkLines"></g>
+
+        <!-- BRANCH NODES -->
+        <g id="branchNodes"></g>
+
+    </svg>
+</div>
+    <div class="noise"></div>
+
+    <div class="wrapper">
+        <div class="login-card">
+
+            <div class="brand">
+                <div class="brand-mark">
+                    <img src="https://cdn.barista.ir/Lamiz.png" alt="Lamiz">
+                </div>
+
+                <h1>LAMIZ</h1>
+                <p>You are going to feel better soon!</p>
+            </div>
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert {% if category == 'info' %}info{% endif %}">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <form method="POST">
+
+                <div class="form-group">
+                    <label class="form-label">Employee Number / Username</label>
+                    <input
+                        type="text"
+                        name="identifier"
+                        class="form-input"
+                        placeholder="Enter your identifier"
+                        required
+                        autofocus>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Password</label>
+                    <input
+                        type="password"
+                        name="password"
+                        class="form-input"
+                        placeholder="Enter your password"
+                        required>
+                </div>
+
+                <button type="submit" class="login-btn">
+                    ورود
+                </button>
+
+            </form>
+
+            <div class="footer">
+                Powered by Planning Team
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        // Fast premium splash
+        window.addEventListener('load', () => {
+            const splash = document.getElementById('splash');
+
+            setTimeout(() => {
+                splash.classList.add('hidden');
+            }, 1800);
+        });
+
+        // Better mobile keyboard UX
+        document.querySelectorAll('input').forEach(input => {
+            input.addEventListener('focus', () => {
+                document.body.style.overflow = 'auto';
+            });
+        });
+
+        // Branch constellation network
+        const branches = [
+
+    // Tehran cluster
+    { name: "Tehran-1", x: 540, y: 300 },
+    { name: "Tehran-2", x: 545, y: 305 },
+    { name: "Tehran-3", x: 535, y: 295 },
+    { name: "Tehran-4", x: 550, y: 310 },
+    { name: "Tehran-5", x: 548, y: 298 },
+
+    // Karaj
+    { name: "Karaj-1", x: 505, y: 310 },
+    { name: "Karaj-2", x: 498, y: 315 },
+
+    // Isfahan
+    { name: "Isfahan", x: 510, y: 470 },
+
+    // Shiraz
+    { name: "Shiraz", x: 470, y: 640 },
+
+    // Ahvaz
+    { name: "Ahvaz", x: 330, y: 560 },
+
+    // Mazandaran Coast
+    { name: "Royan", x: 520, y: 250 },
+    { name: "MotelGhoo", x: 545, y: 240 },
+    { name: "IzadShahr", x: 560, y: 245 },
+    { name: "Babolsar", x: 610, y: 240 },
+
+    // Kish Island
+    { name: "Kish-1", x: 430, y: 790 },
+    { name: "Kish-2", x: 445, y: 800 },
+
+    // Tehran-Isfahan Road
+    { name: "HighwayBranch", x: 525, y: 390 }
+];
+
+const nodeLayer = document.getElementById('branchNodes');
+const lineLayer = document.getElementById('networkLines');
+
+branches.forEach(branch => {
+
+    const node = document.createElementNS(
+        'http://www.w3.org/2000/svg',
+        'circle'
+    );
+
+    node.setAttribute('cx', branch.x);
+    node.setAttribute('cy', branch.y);
+    node.setAttribute('r', 4);
+
+    node.setAttribute('class', 'branch-node');
+
+    nodeLayer.appendChild(node);
+});
+
+// Intelligent connections
+for (let i = 0; i < branches.length; i++) {
+
+    for (let j = i + 1; j < branches.length; j++) {
+
+        const a = branches[i];
+        const b = branches[j];
+
+        const dx = a.x - b.x;
+        const dy = a.y - b.y;
+
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        if (distance < 180) {
+
+            const line = document.createElementNS(
+                'http://www.w3.org/2000/svg',
+                'line'
+            );
+
+            line.setAttribute('x1', a.x);
+            line.setAttribute('y1', a.y);
+
+            line.setAttribute('x2', b.x);
+            line.setAttribute('y2', b.y);
+
+            line.setAttribute('class', 'branch-line');
+
+            lineLayer.appendChild(line);
+        }
+    }
+}
+
+        console.log('Lamiz is Ready');
+    </script>
+
+</body>
+</html>

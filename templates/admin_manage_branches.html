@@ -1,0 +1,265 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    @keyframes flash-green {
+        from { background-color: #D1FAE5; }
+        to { background-color: transparent; }
+    }
+    .flash-success {
+        animation: flash-green 1.5s ease-out;
+    }
+    .table-input {
+        width: 100%;
+        min-width: 120px;
+        padding: 6px 8px;
+        border: 1px solid #D1D5DB;
+        border-radius: 6px;
+        background-color: #F9FAFB;
+        transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .table-input:focus {
+        outline: none;
+        border-color: #3B82F6;
+        box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.4);
+    }
+    .branch-notes {
+        width: 100%;
+        min-width: 160px;
+        padding: 6px 8px;
+        border: 1px solid #D1D5DB;
+        border-radius: 6px;
+        background-color: #F9FAFB;
+        font-size: 13px;
+        resize: vertical;
+    }
+    .branch-notes:focus {
+        outline: none;
+        border-color: #3B82F6;
+        box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.4);
+    }
+</style>
+
+<div class="mb-6">
+    <h2 class="text-3xl font-bold text-slate-800">Branch Management</h2>
+    <p class="text-slate-500 mt-1">View, edit, and update the status of all active branches.</p>
+</div>
+
+<div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-x-auto">
+    <table class="w-full text-sm text-left text-slate-600">
+        <thead class="text-xs text-slate-700 uppercase bg-slate-50">
+            <tr>
+                <th scope="col" class="px-6 py-3">Branch Name</th>
+                <th scope="col" class="px-6 py-3">Farsi Name</th>
+                <th scope="col" class="px-6 py-3">Supervisor(s)</th>
+                <th scope="col" class="px-6 py-3">Status</th>
+                <th scope="col" class="px-6 py-3">Min. Staff</th>
+                <th scope="col" class="px-6 py-3">Hours (Open/Close)</th>
+                <th scope="col" class="px-6 py-3">Morning Shift (Start/End)</th>
+                <th scope="col" class="px-6 py-3">Evening Shift (Start/End)</th>
+                <th scope="col" class="px-6 py-3">Notes</th>
+                <th scope="col" class="px-6 py-3 text-center">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for branch in branches %}
+            <tr class="bg-white border-b hover:bg-slate-50" data-branch-id="{{ branch.id }}">
+                <!-- Branch Name -->
+                <td class="px-6 py-4 font-semibold text-slate-900 whitespace-nowrap">{{ branch.branch_name }}</td>
+                
+                <!-- Farsi Name -->
+                <td class="px-6 py-4 font-semibold text-slate-900 whitespace-nowrap">{{ branch.branch_name_farsi }}</td>
+                
+                <!-- Supervisors -->
+                <td class="px-6 py-4 text-slate-700">
+                    {% set b_name = branch.branch_name_farsi or branch.branch_name %}
+                    {% if branch_supervisors.get(b_name) %}
+                        <span class="font-medium">{{ branch_supervisors[b_name] | join(', ') }}</span>
+                    {% else %}
+                        <span class="text-slate-400 italic">بدون سرپرست</span>
+                    {% endif %}
+                </td>
+
+                <!-- Status -->
+                <td class="px-6 py-4 status-cell">
+                    {% if branch.branch_status == 'active' %}
+                        <span class="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">فعال</span>
+                    {% elif branch.branch_status == 'sealed' %}
+                        <span class="px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800">پلمب</span>
+                    {% elif branch.branch_status == 'pending' %}
+                        <span class="px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">افتتاحیه</span>
+                    {% else %}
+                        <span class="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800">{{ branch.branch_status }}</span>
+                    {% endif %}
+                </td>
+
+                <!-- Min Staff -->
+                <td class="px-6 py-4">
+                    <input type="number" class="table-input" style="width: 70px;" value="{{ branch.branch_minimum_staff or '' }}" data-field="branch_minimum_staff">
+                </td>
+
+                <!-- Open/Close Hours -->
+                <td class="px-6 py-4">
+                    <div class="flex gap-2">
+                        <input type="time" class="table-input" value="{{ branch.opening_hour.strftime('%H:%M') if branch.opening_hour else '' }}" data-field="opening_hour">
+                        <input type="time" class="table-input" value="{{ branch.closing_hour.strftime('%H:%M') if branch.closing_hour else '' }}" data-field="closing_hour">
+                    </div>
+                </td>
+
+                <!-- Morning Shift -->
+                <td class="px-6 py-4">
+                    <div class="flex gap-2">
+                        <input type="time" class="table-input" value="{{ branch.morning_shift_start.strftime('%H:%M') if branch.morning_shift_start else '' }}" data-field="morning_shift_start">
+                        <input type="time" class="table-input" value="{{ branch.morning_shift_end.strftime('%H:%M') if branch.morning_shift_end else '' }}" data-field="morning_shift_end">
+                    </div>
+                </td>
+
+                <!-- Evening Shift -->
+                <td class="px-6 py-4">
+                    <div class="flex gap-2">
+                        <input type="time" class="table-input" value="{{ branch.evening_shift_start.strftime('%H:%M') if branch.evening_shift_start else '' }}" data-field="evening_shift_start">
+                        <input type="time" class="table-input" value="{{ branch.evening_shift_end.strftime('%H:%M') if branch.evening_shift_end else '' }}" data-field="evening_shift_end">
+                    </div>
+                </td>
+
+                <!-- Notes Column -->
+                <td class="px-6 py-4">
+                    {% if user_role == 'branch_viewer' %}
+                        <div class="p-2 bg-slate-50 border border-slate-200 rounded text-xs text-slate-700 whitespace-pre-wrap" style="min-width: 150px;">{{ branch.notes or 'بدون یادداشت' }}</div>
+                    {% else %}
+                        <textarea class="branch-notes" data-field="notes" rows="2" placeholder="یادداشت...">{{ branch.notes or '' }}</textarea>
+                    {% endif %}
+                </td>
+
+                <!-- Actions -->
+                <td class="px-6 py-4">
+                    <div class="flex flex-col items-center gap-2">
+                        {% if user_role != 'branch_viewer' %}
+                            <button class="btn-save w-full text-white bg-blue-600 hover:bg-blue-700 font-medium rounded-lg text-xs px-4 py-2 transition">Save</button>
+                        {% endif %}
+                        <div class="action-cell w-full">
+                            {% if user_role != 'branch_viewer' %}
+                                {% if branch.branch_status == 'active' %}
+                                    <button class="btn-seal w-full text-white bg-red-600 hover:bg-red-700 font-medium rounded-lg text-xs px-4 py-2 transition">پلمب</button>
+                                {% elif branch.branch_status == 'sealed' %}
+                                    <button class="btn-seal w-full text-white bg-emerald-600 hover:bg-emerald-700 font-medium rounded-lg text-xs px-4 py-2 transition">رفع پلمب</button>
+                                {% else %}
+                                    <button class="btn-seal w-full text-slate-500 bg-slate-200 font-medium rounded-lg text-xs px-4 py-2 cursor-not-allowed" disabled>--</button>
+                                {% endif %}
+                            {% else %}
+                                <span class="text-xs text-slate-400">فقط خواندنی</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+
+    async function apiFetch(url, options = {}) {
+        const defaultOptions = {
+            headers: { 'Content-Type': 'application/json' },
+        };
+        const res = await fetch(url, { ...defaultOptions, ...options });
+        const json = await res.json();
+        if (!res.ok) {
+            throw new Error(json.message || `HTTP Error ${res.status}`);
+        }
+        return json;
+    }
+
+    document.querySelectorAll('.btn-save').forEach(button => {
+        button.addEventListener('click', async (e) => {
+            const row = e.target.closest('tr');
+            const branchId = row.dataset.branchId;
+            const payload = {};
+
+            // Collect values from regular inputs
+            row.querySelectorAll('.table-input').forEach(input => {
+                payload[input.dataset.field] = input.value || null;
+            });
+
+            // Collect value from notes textarea
+            const notesEl = row.querySelector('.branch-notes');
+            if (notesEl) {
+                payload['notes'] = notesEl.value || '';
+            }
+
+            try {
+                const result = await apiFetch(`/api/branches/${branchId}/update`, {
+                    method: 'PUT',
+                    body: JSON.stringify(payload)
+                });
+                row.classList.add('flash-success');
+                setTimeout(() => row.classList.remove('flash-success'), 1500);
+                alert(result.message);
+            } catch (error) {
+                console.error('Update failed:', error);
+                alert('Error: ' + error.message);
+            }
+        });
+    });
+
+    document.querySelectorAll('.btn-seal').forEach(button => {
+        button.addEventListener('click', async (e) => {
+            const row = e.target.closest('tr');
+            const branchId = row.dataset.branchId;
+
+            if (!confirm('Are you sure you want to change the branch status?')) {
+                return;
+            }
+
+            try {
+                const result = await apiFetch(`/api/branches/${branchId}/toggle_seal`, {
+                    method: 'POST'
+                });
+                updateStatusUI(row, result.new_status);
+                alert(result.message);
+            } catch (error) {
+                console.error('Status change failed:', error);
+                alert('Error: ' + error.message);
+            }
+        });
+    });
+
+    function updateStatusUI(row, newStatus) {
+        const statusCell = row.querySelector('.status-cell');
+        const actionCell = row.querySelector('.action-cell');
+
+        let statusHtml = '';
+        let actionHtml = '';
+
+        if (newStatus === 'active') {
+            statusHtml = `<span class="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">فعال</span>`;
+            actionHtml = `<button class="btn-seal w-full text-white bg-red-600 hover:bg-red-700 font-medium rounded-lg text-xs px-4 py-2 transition">پلمب</button>`;
+        } else if (newStatus === 'sealed') {
+            statusHtml = `<span class="px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800">پلمب</span>`;
+            actionHtml = `<button class="btn-seal w-full text-white bg-emerald-600 hover:bg-emerald-700 font-medium rounded-lg text-xs px-4 py-2 transition">رفع پلمب</button>`;
+        }
+
+        statusCell.innerHTML = statusHtml;
+        actionCell.innerHTML = actionHtml;
+
+        const sealBtn = actionCell.querySelector('.btn-seal');
+        if (sealBtn) {
+            sealBtn.addEventListener('click', async (e) => {
+                 const branchId = row.dataset.branchId;
+                 if (!confirm('Are you sure you want to change the branch status?')) return;
+                 try {
+                    const result = await apiFetch(`/api/branches/${branchId}/toggle_seal`, { method: 'POST' });
+                    updateStatusUI(row, result.new_status);
+                    alert(result.message);
+                } catch (error) {
+                    alert('Error: ' + error.message);
+                }
+            });
+        }
+    }
+});
+</script>
+{% endblock %}

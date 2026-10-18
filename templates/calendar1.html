@@ -1,0 +1,317 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<style>
+    /* Styling for draft shifts */
+    .dashed-border { border: 2px dashed #1E3A8A !important; }
+
+    /* Make background events look better */
+    .fc-bg-event { opacity: 0.6 !important; }
+    .fc-bg-event .fc-event-title {
+        padding: 4px;
+        font-weight: bold;
+        color: #B45309;
+        text-align: center;
+        font-size: 0.85rem;
+    }
+</style>
+
+<!-- Header Controls -->
+<div class="flex justify-between items-end mb-6">
+    <div>
+        <h2 class="text-3xl font-bold text-slate-800">
+            {% if view_type == 'admin' %} Draw Official Shifts {% else %} Assign Staff to Shifts {% endif %}
+        </h2>
+        <p class="text-slate-500 mt-1">
+            {% if view_type == 'admin' %}
+                Click & drag over the yellow background blocks, or click anywhere to open the Shift menu.
+            {% else %}
+                Drag Baristas from the left and drop them onto the blue shifts.
+            {% endif %}
+        </p>
+    </div>
+
+    <div class="flex gap-4">
+        <select id="branchFilter" class="bg-white border border-slate-300 text-slate-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-amber-500 outline-none shadow-sm">
+            <option value="">-- Select a Branch --</option>
+            {% for b in all_branches %}
+                <option value="{{ b }}">{{ b }}</option>
+            {% endfor %}
+        </select>
+
+        {% if view_type == 'admin' %}
+        <button onclick="approveDrafts()" class="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 shadow-sm font-semibold transition flex items-center">
+            <i class="fa-solid fa-paper-plane mr-2"></i> Publish/Approve Drafts
+        </button>
+        {% endif %}
+    </div>
+</div>
+
+<div class="flex gap-6 h-[75vh]">
+    {% if view_type == 'supervisor' %}
+    <!-- SUPERVISOR SIDEBAR: Draggable Baristas -->
+    <div class="w-64 bg-white rounded-2xl shadow-sm border border-slate-100 p-4 overflow-y-auto hidden md:block">
+        <h3 class="font-bold text-slate-800 border-b pb-2 mb-4">Available Baristas</h3>
+        <div id="employeeList" class="space-y-2">
+            <!-- Populated by JS -->
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Calendar Container -->
+    <div class="flex-1 bg-white p-6 rounded-2xl shadow-sm border border-slate-100 h-full overflow-hidden">
+        <div id="calendar" class="h-full"></div>
+    </div>
+</div>
+
+{% if view_type == 'admin' %}
+<!-- SHIFT DRAWING / EDITING MODAL -->
+<div id="shiftModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden flex justify-center items-center z-50">
+    <div class="bg-white rounded-2xl p-6 w-[450px] shadow-2xl transition-transform">
+        <h3 class="text-xl font-bold text-slate-800 mb-4" id="modalHeader">Draw Official Shift</h3>
+
+        <input type="hidden" id="shiftId">
+
+        <!-- EXPLICIT TIME RANGE INPUTS FOR BETTER UX -->
+        <div class="grid grid-cols-2 gap-4 mb-4">
+            <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Start Time</label>
+                <input type="datetime-local" id="shiftStart" class="w-full px-3 py-2 bg-amber-50 border border-amber-200 text-amber-900 font-semibold rounded-lg focus:ring-2 focus:ring-amber-500 outline-none text-sm">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">End Time</label>
+                <input type="datetime-local" id="shiftEnd" class="w-full px-3 py-2 bg-amber-50 border border-amber-200 text-amber-900 font-semibold rounded-lg focus:ring-2 focus:ring-amber-500 outline-none text-sm">
+            </div>
+        </div>
+
+        <div class="mb-4">
+            <label class="block text-sm font-semibold text-slate-700 mb-1">Shift Title</label>
+            <input type="text" id="shiftTitle" placeholder="e.g. Morning Lead Barista" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+        </div>
+
+        <div class="mb-6">
+            <label class="block text-sm font-semibold text-slate-700 mb-1">Shift Description</label>
+            <textarea id="shiftDescription" rows="3" placeholder="Duties..." class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"></textarea>
+        </div>
+
+        <div class="flex justify-between gap-3">
+            <button id="btnDeleteShift" onclick="deleteShift()" class="hidden flex-1 bg-red-100 text-red-600 font-bold py-2 rounded-lg hover:bg-red-200 transition">Delete</button>
+            <button onclick="saveShift()" class="flex-1 bg-blue-600 text-white font-bold py-2 rounded-lg hover:bg-blue-700 transition">Save Shift</button>
+        </div>
+        <button onclick="closeModal()" class="w-full mt-3 text-slate-500 text-sm hover:text-slate-800 font-semibold py-2">Cancel</button>
+    </div>
+</div>
+{% endif %}
+
+<script>
+    let calendar;
+    const viewType = "{{ view_type }}";
+
+    // Helper to format ISO strings for the <input type="datetime-local">
+    function formatForInput(dateStr) {
+        if(!dateStr) return "";
+        // Fullcalendar passes local time string like "2026-04-27T10:00:00+03:30"
+        // We just slice off the first 16 characters to get exactly "2026-04-27T10:00"
+        return dateStr.substring(0, 16);
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        if(viewType === 'supervisor') {
+            fetch('/api/employees').then(r => r.json()).then(emps => {
+                const list = document.getElementById('employeeList');
+                emps.forEach(e => {
+                    list.innerHTML += `
+                        <div class="p-3 bg-slate-50 border border-slate-200 rounded-lg cursor-grab hover:bg-slate-100 flex items-center mb-2"
+                             draggable="true" ondragstart="dragEmp(event, '${e.id}', '${e.name}')">
+                            <i class="fa-solid fa-user-circle text-slate-400 mr-2 text-xl"></i>
+                            <div class="text-sm font-semibold text-slate-700">${e.name}</div>
+                        </div>
+                    `;
+                });
+            });
+        }
+
+        var calendarEl = document.getElementById('calendar');
+        calendar = new FullCalendar.Calendar(calendarEl, {
+            initialView: 'timeGridWeek',
+            headerToolbar: { left: 'prev,next today', center: 'title', right: 'timeGridWeek,timeGridDay' },
+            allDaySlot: false,
+            selectable: viewType === 'admin',
+            selectMirror: true,
+
+            events: function(info, successCallback, failureCallback) {
+                let branch = document.getElementById('branchFilter').value;
+                if(!branch && viewType === 'admin') { successCallback([]); return; }
+
+                fetch(`/api/events?branch=${branch}`)
+                    .then(res => {
+                        if (!res.ok) throw new Error("API Error. Check Flask terminal.");
+                        return res.json();
+                    })
+                    .then(data => {
+                        // CALCULATE DAILY TOTALS
+                        let dailyTotals = {};
+                        data.forEach(e => {
+                            if(e.extendedProps && e.extendedProps.type === 'recommendation') {
+                                let dateObj = e.start.split('T')[0];
+                                dailyTotals[dateObj] = (dailyTotals[dateObj] || 0) + parseFloat(e.extendedProps.baristas);
+                            }
+                        });
+
+                        setTimeout(() => {
+                            document.querySelectorAll('.fc-col-header-cell').forEach(cell => {
+                                let dateStr = cell.getAttribute('data-date');
+                                let existing = cell.querySelector('.daily-total');
+                                if(existing) existing.remove();
+
+                                if(dailyTotals[dateStr]) {
+                                    let cushion = cell.querySelector('.fc-col-header-cell-cushion');
+                                    cushion.innerHTML += `<div class="daily-total text-[11px] bg-amber-100 text-amber-700 rounded px-1.5 py-0.5 mt-1 border border-amber-200">${dailyTotals[dateStr].toFixed(1)} Man-hours</div>`;
+                                }
+                            });
+                        }, 50);
+                        successCallback(data);
+                    })
+                    .catch(err => {
+                        console.error(err);
+                        failureCallback(err);
+                    });
+            },
+
+            // ADMIN CLICK & DRAG
+            select: function(info) {
+                let branch = document.getElementById('branchFilter').value;
+                if(!branch) { alert('Select a Branch first!'); calendar.unselect(); return; }
+                openShiftModal(null, info.startStr, info.endStr);
+            },
+
+            // EVENT CLICK
+            eventClick: function(info) {
+                let props = info.event.extendedProps;
+                if (viewType === 'admin' && props.type === 'shift') {
+                    openShiftModal(info.event);
+                } else if (viewType === 'supervisor' && props.type === 'shift') {
+                    alert(`Shift: ${info.event.title}\nDescription: ${props.description || 'N/A'}\nStatus: ${props.assigned_to ? 'Assigned to ' + props.assigned_to : 'Needs Assignment'}`);
+                }
+            },
+
+            // SUPERVISOR DRAG/DROP
+            eventDidMount: function(info) {
+                if(viewType === 'supervisor' && info.event.extendedProps.type === 'shift') {
+                    let el = info.el;
+                    el.addEventListener('dragover', function(e) { e.preventDefault(); el.style.opacity = '0.7'; });
+                    el.addEventListener('dragleave', function(e) { el.style.opacity = '1'; });
+                    el.addEventListener('drop', function(e) {
+                        e.preventDefault();
+                        el.style.opacity = '1';
+
+                        let empId = e.dataTransfer.getData('empId');
+                        let empName = e.dataTransfer.getData('empName');
+                        let shiftId = info.event.id.replace('shift_', '');
+
+                        if(confirm(`Assign ${empName} to this shift?`)) {
+                            fetch(`/api/shifts/${shiftId}/assign`, {
+                                method: 'POST',
+                                headers: {'Content-Type': 'application/json'},
+                                body: JSON.stringify({emp_id: empId, emp_name: empName})
+                            }).then(() => calendar.refetchEvents());
+                        }
+                    });
+                }
+            }
+        });
+        calendar.render();
+        document.getElementById('branchFilter').addEventListener('change', () => calendar.refetchEvents());
+    });
+
+    function dragEmp(ev, empId, empName) {
+        ev.dataTransfer.setData('empId', empId);
+        ev.dataTransfer.setData('empName', empName);
+    }
+
+    {% if view_type == 'admin' %}
+    function openShiftModal(event = null, startStr = null, endStr = null) {
+        document.getElementById('shiftModal').classList.remove('hidden');
+
+        if(event) {
+            document.getElementById('modalHeader').innerText = "Edit Official Shift";
+            document.getElementById('shiftId').value = event.id.replace('shift_', '');
+            document.getElementById('shiftTitle').value = event.title;
+            document.getElementById('shiftDescription').value = event.extendedProps.description;
+
+            // Set inputs using event start/end
+            document.getElementById('shiftStart').value = formatForInput(event.startStr);
+            document.getElementById('shiftEnd').value = formatForInput(event.endStr);
+
+            document.getElementById('btnDeleteShift').classList.remove('hidden');
+        } else {
+            document.getElementById('modalHeader').innerText = "Draw Official Shift";
+            document.getElementById('shiftId').value = '';
+            document.getElementById('shiftTitle').value = '';
+            document.getElementById('shiftDescription').value = '';
+
+            // Set inputs using dragged start/end
+            document.getElementById('shiftStart').value = formatForInput(startStr);
+            document.getElementById('shiftEnd').value = formatForInput(endStr);
+
+            document.getElementById('btnDeleteShift').classList.add('hidden');
+        }
+    }
+
+    function closeModal() {
+        document.getElementById('shiftModal').classList.add('hidden');
+        calendar.unselect();
+    }
+
+    async function saveShift() {
+        let branch = document.getElementById('branchFilter').value;
+        let id = document.getElementById('shiftId').value;
+
+        // FIX: Stop using new Date().toISOString() because it converts to UTC!
+        // We just take the exact literal value from the input and append ':00' for seconds.
+        let startVal = document.getElementById('shiftStart').value + ':00';
+        let endVal = document.getElementById('shiftEnd').value + ':00';
+
+        let payload = {
+            branch: branch,
+            title: document.getElementById('shiftTitle').value,
+            description: document.getElementById('shiftDescription').value,
+            start: startVal,
+            end: endVal
+        };
+
+        if (id) {
+            // UPDATE
+            await fetch(`/api/shifts/${id}`, {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            });
+        } else {
+            // CREATE NEW
+            await fetch(`/api/shifts`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            });
+        }
+        closeModal();
+        calendar.refetchEvents();
+    }
+
+    async function deleteShift() {
+        if(!confirm('Delete this shift?')) return;
+        let id = document.getElementById('shiftId').value;
+        await fetch(`/api/shifts/${id}`, { method: 'DELETE' });
+        closeModal(); calendar.refetchEvents();
+    }
+
+    async function approveDrafts() {
+        let branch = document.getElementById('branchFilter').value;
+        if(!confirm('Publish all Drafts to Supervisors' + (branch ? ` for ${branch}` : '') + '?')) return;
+        await fetch('/api/shifts/approve_all', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({branch: branch}) });
+        calendar.refetchEvents();
+    }
+    {% endif %}
+</script>
+{% endblock %}

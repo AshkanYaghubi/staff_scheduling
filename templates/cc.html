@@ -1,0 +1,810 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<style>
+.cross-hatch {
+    background-image: repeating-linear-gradient(
+        45deg,
+        transparent,
+        transparent 10px,
+        rgba(0,0,0,.1) 10px,
+        rgba(0,0,0,.1) 20px
+    );
+}
+
+.fc-bg-event { opacity: 0.55 !important; }
+.fc-bg-event .fc-event-title {
+    padding: 4px 4px 4px 10px;
+    font-weight: bold;
+    color: #B45309;
+    text-align: center;
+    font-size: 0.85rem;
+}
+
+/* Foreground shift events: leave left edge for the coverage strip */
+.fc-timegrid-event-harness {
+    margin-left: 6px !important;
+}
+
+/* Coverage strips: injected via JS into each column frame */
+.coverage-strip {
+    position: absolute;
+    left: 0;
+    width: 5px;
+    z-index: 20;
+    pointer-events: none;
+    border-radius: 0 2px 2px 0;
+    transition: opacity 0.2s;
+}
+
+.dashed-border { border: 2px dashed #1E3A8A !important; }
+
+#branchInfo {
+    margin-top: 20px;
+    padding: 15px;
+    background: #F9FAFB;
+    border: 1px solid #E5E7EB;
+    border-radius: 8px;
+    display: none;
+}
+#branchInfo h3 { margin-top: 0; color: #1F2937; }
+#branchInfo .info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 10px;
+    margin-top: 10px;
+}
+#branchInfo .info-item { padding: 8px; background: white; border-radius: 4px; }
+#branchInfo .info-label { font-weight: 600; color: #6B7280; font-size: 0.875rem; }
+#branchInfo .info-value { color: #111827; font-size: 1rem; margin-top: 4px; }
+</style>
+
+<!-- Header Controls -->
+<div class="flex justify-between items-end mb-6">
+    <div>
+        <h2 class="text-3xl font-bold text-slate-800">
+            {% if view_type == 'admin' %} Draw Official Shifts {% else %} Assign Staff to Shifts {% endif %}
+        </h2>
+        <p class="text-slate-500 mt-1">
+            {% if view_type == 'admin' %}
+                Click &amp; drag over the yellow background blocks to draw shifts.
+            {% else %}
+                Viewing schedule for branch: <strong class="text-amber-600">{{ current_user.branch_name or "Unassigned" }}</strong>. Drag Baristas to assign them.
+            {% endif %}
+        </p>
+    </div>
+
+    <div class="flex gap-3 items-center">
+        {% if view_type == 'admin' %}
+        <select id="branchFilter" class="bg-white border border-slate-300 text-slate-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-amber-500 outline-none shadow-sm">
+            <option value="">-- Select a Branch --</option>
+            {% for b in all_branches %}
+                <option value="{{ b }}">{{ b }}</option>
+            {% endfor %}
+        </select>
+
+        <!-- Shift times settings button (enabled when a branch is selected) -->
+        <button id="btnShiftTimes" disabled
+            class="bg-slate-100 text-slate-400 px-4 py-2 rounded-lg shadow-sm font-semibold transition flex items-center cursor-not-allowed"
+            title="Select a branch first">
+            <i class="fa-solid fa-clock mr-2"></i> Shift Times
+        </button>
+
+        <button id="btnApprove" class="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 shadow-sm font-semibold transition flex items-center">
+            <i class="fa-solid fa-paper-plane mr-2"></i> Publish/Approve Drafts
+        </button>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Coverage legend (admin only) -->
+{% if view_type == 'admin' %}
+<div class="flex gap-4 mb-3 text-xs font-semibold text-slate-500 items-center">
+    <span class="font-bold text-slate-700">Coverage strips:</span>
+    <span class="flex items-center gap-1"><span style="display:inline-block;width:10px;height:10px;background:#EF4444;border-radius:2px"></span> Understaffed</span>
+    <span class="flex items-center gap-1"><span style="display:inline-block;width:10px;height:10px;background:#10B981;border-radius:2px"></span> Overstaffed</span>
+    <span class="flex items-center gap-1"><span style="display:inline-block;width:10px;height:10px;background:#D1D5DB;border-radius:2px"></span> On target</span>
+</div>
+{% endif %}
+
+<div class="flex gap-6 h-[75vh]">
+    {% if view_type == 'supervisor' %}
+    <!-- SUPERVISOR SIDEBAR: Draggable Baristas -->
+    <div class="w-64 bg-white rounded-2xl shadow-sm border border-slate-100 p-4 overflow-y-auto hidden md:block">
+        <h3 class="font-bold text-slate-800 border-b pb-2 mb-4">Your Baristas</h3>
+        <div id="employeeList" class="space-y-2"></div>
+    </div>
+    {% endif %}
+
+    <!-- Calendar Container -->
+    <div class="flex-1 bg-white p-6 rounded-2xl shadow-sm border border-slate-100 h-full overflow-hidden">
+        <div id="calendar" class="h-full"></div>
+    </div>
+</div>
+
+<div id="branchInfo">
+    <h3>Branch Information</h3>
+    <div class="info-grid">
+        <div class="info-item"><div class="info-label">Branch Name (Farsi)</div><div class="info-value" id="branchNameFarsi">-</div></div>
+        <div class="info-item"><div class="info-label">Branch Area</div><div class="info-value" id="branchArea">-</div></div>
+        <div class="info-item"><div class="info-label">Opening Hours</div><div class="info-value" id="branchHours">-</div></div>
+        <div class="info-item"><div class="info-label">Minimum Staff</div><div class="info-value" id="branchMinStaff">-</div></div>
+        <div class="info-item"><div class="info-label">Branch Code</div><div class="info-value" id="branchCode">-</div></div>
+        <div class="info-item"><div class="info-label">Status</div><div class="info-value" id="branchStatus">-</div></div>
+    </div>
+</div>
+
+{% if view_type == 'admin' %}
+<!-- ========================================================
+     SHIFT DRAWING / EDITING MODAL
+     ======================================================== -->
+<div id="shiftModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden flex justify-center items-center z-50">
+    <div class="bg-white rounded-2xl p-6 w-[470px] shadow-2xl">
+        <h3 class="text-xl font-bold text-slate-800 mb-4" id="modalHeader">Draw Official Shift</h3>
+
+        <input type="hidden" id="shiftId">
+
+        <!-- Quick-fill: morning / evening -->
+        <div class="mb-4">
+            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Quick Fill</label>
+            <div class="flex gap-2">
+                <button type="button" id="btnFillMorning"
+                    class="flex-1 bg-amber-50 text-amber-700 border border-amber-200 font-semibold py-2 rounded-lg hover:bg-amber-100 transition text-sm flex items-center justify-center gap-1">
+                    🌅 Morning Shift
+                </button>
+                <button type="button" id="btnFillEvening"
+                    class="flex-1 bg-indigo-50 text-indigo-700 border border-indigo-200 font-semibold py-2 rounded-lg hover:bg-indigo-100 transition text-sm flex items-center justify-center gap-1">
+                    🌙 Evening Shift
+                </button>
+            </div>
+            <p id="quickFillHint" class="text-xs text-slate-400 mt-1 hidden">Configure shift times via the "Shift Times" button.</p>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4 mb-4">
+            <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Start Time</label>
+                <input type="datetime-local" id="shiftStart" class="w-full px-3 py-2 bg-amber-50 border border-amber-200 text-amber-900 font-semibold rounded-lg focus:ring-2 focus:ring-amber-500 outline-none text-sm">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">End Time</label>
+                <input type="datetime-local" id="shiftEnd" class="w-full px-3 py-2 bg-amber-50 border border-amber-200 text-amber-900 font-semibold rounded-lg focus:ring-2 focus:ring-amber-500 outline-none text-sm">
+            </div>
+        </div>
+
+        <div class="mb-4">
+            <label class="block text-sm font-semibold text-slate-700 mb-1">Shift Title</label>
+            <input type="text" id="shiftTitle" placeholder="e.g. Morning Lead Barista"
+                class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+        </div>
+
+        <div class="mb-6">
+            <label class="block text-sm font-semibold text-slate-700 mb-1">Shift Description</label>
+            <textarea id="shiftDescription" rows="3" placeholder="Duties..."
+                class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"></textarea>
+        </div>
+
+        <div class="flex justify-between gap-3">
+            <button id="btnDeleteShift" class="hidden flex-1 bg-red-100 text-red-600 font-bold py-2 rounded-lg hover:bg-red-200 transition">Delete</button>
+            <button id="btnSaveShift"   class="flex-1 bg-blue-600 text-white font-bold py-2 rounded-lg hover:bg-blue-700 transition">Save Shift</button>
+        </div>
+        <button id="btnCancelShift" class="w-full mt-3 text-slate-500 text-sm hover:text-slate-800 font-semibold py-2">Cancel</button>
+    </div>
+</div>
+
+<!-- ========================================================
+     BRANCH SHIFT TIMES SETTINGS MODAL
+     ======================================================== -->
+<div id="shiftTimesModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden flex justify-center items-center z-50">
+    <div class="bg-white rounded-2xl p-6 w-[420px] shadow-2xl">
+        <h3 class="text-xl font-bold text-slate-800 mb-1">⏰ Branch Shift Times</h3>
+        <p class="text-sm text-slate-500 mb-5" id="shiftTimesModalBranch">Configure default start/end for morning and evening shifts.</p>
+
+        <div class="mb-5">
+            <div class="flex items-center gap-2 mb-3">
+                <span class="text-lg">🌅</span>
+                <span class="text-sm font-bold text-amber-700 uppercase tracking-wider">Morning (Open) Shift</span>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="text-xs text-slate-500 font-semibold block mb-1">Start</label>
+                    <input type="time" id="stMorningStart" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-400 outline-none">
+                </div>
+                <div>
+                    <label class="text-xs text-slate-500 font-semibold block mb-1">End</label>
+                    <input type="time" id="stMorningEnd" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-400 outline-none">
+                </div>
+            </div>
+        </div>
+
+        <div class="mb-6">
+            <div class="flex items-center gap-2 mb-3">
+                <span class="text-lg">🌙</span>
+                <span class="text-sm font-bold text-indigo-700 uppercase tracking-wider">Evening (Close) Shift</span>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="text-xs text-slate-500 font-semibold block mb-1">Start</label>
+                    <input type="time" id="stEveningStart" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-400 outline-none">
+                </div>
+                <div>
+                    <label class="text-xs text-slate-500 font-semibold block mb-1">End</label>
+                    <input type="time" id="stEveningEnd" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-400 outline-none">
+                </div>
+            </div>
+        </div>
+
+        <div class="flex gap-3">
+            <button id="btnSaveShiftTimes"   class="flex-1 bg-blue-600 text-white font-bold py-2 rounded-lg hover:bg-blue-700 transition">Save</button>
+            <button id="btnCancelShiftTimes" class="flex-1 bg-slate-100 text-slate-600 font-bold py-2 rounded-lg hover:bg-slate-200 transition">Cancel</button>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<script>
+(function() {
+    'use strict';
+
+    const viewType = "{{ view_type }}";
+    let calendar   = null;
+
+    // Stores the current branch's shift time config (populated by loadBranchInfo)
+    let branchShiftTimes = {
+        morning_shift_start: null,
+        morning_shift_end:   null,
+        evening_shift_start: null,
+        evening_shift_end:   null
+    };
+
+    // Coverage data: { 'YYYY-MM-DD|HH': '#color' }
+    let coverageMap = {};
+
+    /* =========================================================
+       UTILITIES
+       ========================================================= */
+    function formatForInput(isoString) {
+        if (!isoString) return '';
+        return isoString.substring(0, 16);
+    }
+
+    function encodeBranch(branch) {
+        return encodeURIComponent(branch || '');
+    }
+
+    async function apiFetch(url, options = {}) {
+        const res = await fetch(url, {
+            headers: { 'Content-Type': 'application/json' },
+            ...options
+        });
+        if (!res.ok) {
+            const text = await res.text().catch(() => 'Unknown error');
+            throw new Error(`HTTP ${res.status}: ${text}`);
+        }
+        return res.json();
+    }
+
+    /* =========================================================
+       BRANCH INFO
+       ========================================================= */
+    function loadBranchInfo(branchName) {
+        const container = document.getElementById('branchInfo');
+        if (!container) return;
+        if (!branchName) {
+            container.style.display = 'none';
+            return;
+        }
+
+        fetch(`/api/branch_info/${encodeBranch(branchName)}`)
+            .then(r => {
+                if (r.status === 404) throw new Error('Branch not found');
+                if (!r.ok) throw new Error('Server error');
+                return r.json();
+            })
+            .then(data => {
+                // Populate info panel
+                document.getElementById('branchNameFarsi').textContent = data.branch_name_farsi || '-';
+                document.getElementById('branchArea').textContent      = data.branch_area ? `${data.branch_area} m²` : '-';
+                document.getElementById('branchHours').textContent     =
+                    (data.opening_hour && data.closing_hour) ? `${data.opening_hour} - ${data.closing_hour}` : '-';
+                document.getElementById('branchMinStaff').textContent  = data.branch_minimum_staff ?? '-';
+                document.getElementById('branchCode').textContent      = data.branch_code_mupra || '-';
+                document.getElementById('branchStatus').textContent    = data.branch_status || '-';
+                container.style.display = 'block';
+
+                // Store shift times for quick-fill
+                branchShiftTimes = {
+                    morning_shift_start: data.morning_shift_start || null,
+                    morning_shift_end:   data.morning_shift_end   || null,
+                    evening_shift_start: data.evening_shift_start || null,
+                    evening_shift_end:   data.evening_shift_end   || null
+                };
+
+                // Enable the "Shift Times" settings button
+                const btnST = document.getElementById('btnShiftTimes');
+                if (btnST) {
+                    btnST.disabled = false;
+                    btnST.classList.remove('text-slate-400', 'cursor-not-allowed');
+                    btnST.classList.add('text-slate-700', 'hover:bg-slate-200', 'cursor-pointer');
+                }
+
+                // Show hint if no times configured yet
+                const hint = document.getElementById('quickFillHint');
+                if (hint) {
+                    const hasConfig = data.morning_shift_start || data.evening_shift_start;
+                    hint.classList.toggle('hidden', !!hasConfig);
+                }
+            })
+            .catch(err => {
+                console.error('Branch info error:', err);
+                container.style.display = 'none';
+            });
+    }
+
+    /* =========================================================
+       SUPERVISOR: DRAGGABLE BARISTAS
+       ========================================================= */
+    function initEmployeeList() {
+        if (viewType !== 'supervisor') return;
+        const list = document.getElementById('employeeList');
+        if (!list) return;
+
+        fetch('/api/employees')
+            .then(r => r.ok ? r.json() : Promise.reject('Failed to load employees'))
+            .then(emps => {
+                list.innerHTML = '';
+                if (!emps || emps.length === 0) {
+                    list.innerHTML = '<p class="text-sm text-slate-500">No baristas found for your branch.</p>';
+                    return;
+                }
+                emps.forEach(e => {
+                    const div = document.createElement('div');
+                    div.className = 'p-3 bg-slate-50 border border-slate-200 rounded-lg cursor-grab hover:bg-slate-100 flex items-center mb-2';
+                    div.draggable = true;
+                    div.innerHTML = `<i class="fa-solid fa-user-circle text-slate-400 mr-2 text-xl"></i><div class="text-sm font-semibold text-slate-700">${e.name}</div>`;
+                    div.addEventListener('dragstart', ev => {
+                        ev.dataTransfer.setData('empId', e.id);
+                        ev.dataTransfer.setData('empName', e.name);
+                    });
+                    list.appendChild(div);
+                });
+            })
+            .catch(err => {
+                console.error(err);
+                list.innerHTML = '<p class="text-sm text-red-500">Error loading baristas.</p>';
+            });
+    }
+
+    /* =========================================================
+       DAILY TOTALS RENDERER
+       ========================================================= */
+    function renderDailyTotals(events) {
+        const totals = {};
+        events.forEach(ev => {
+            if (ev.extendedProps?.type === 'recommendation') {
+                const dateKey = ev.start.split('T')[0];
+                totals[dateKey] = (totals[dateKey] || 0) + parseFloat(ev.extendedProps.baristas || 0);
+            }
+        });
+
+        requestAnimationFrame(() => {
+            document.querySelectorAll('.fc-col-header-cell').forEach(cell => {
+                const dateStr = cell.getAttribute('data-date');
+                const existing = cell.querySelector('.daily-total');
+                if (existing) existing.remove();
+
+                if (dateStr && totals[dateStr]) {
+                    const cushion = cell.querySelector('.fc-col-header-cell-cushion');
+                    if (cushion) {
+                        const badge = document.createElement('div');
+                        badge.className = 'daily-total text-[11px] bg-amber-100 text-amber-700 rounded px-1.5 py-0.5 mt-1 border border-amber-200 inline-block';
+                        badge.textContent = `${totals[dateStr].toFixed(1)} Man-hours`;
+                        cushion.appendChild(badge);
+                    }
+                }
+            });
+        });
+    }
+
+    /* =========================================================
+       COVERAGE STRIPS  (color line per hour per column)
+       ========================================================= */
+    function buildCoverageMap(events) {
+        coverageMap = {};
+        events.forEach(ev => {
+            if (ev.extendedProps?.type !== 'recommendation') return;
+            const dateStr = ev.start.split('T')[0];
+            const hour    = parseInt(ev.start.split('T')[1] || '0');
+            const gap      = ev.extendedProps.gap      || 0;
+            const required = ev.extendedProps.baristas || 0;
+            if (required === 0) return; // no recommendation → no strip
+
+            let color;
+            if      (gap >  0.5) color = '#10B981'; // green  – overstaffed
+            else if (gap < -0.5) color = '#EF4444'; // red    – understaffed
+            else                 color = '#D1D5DB'; // gray   – on target
+
+            if (!coverageMap[dateStr]) coverageMap[dateStr] = {};
+            coverageMap[dateStr][hour] = color;
+        });
+    }
+
+    function injectCoverageStrips() {
+        // Remove previous strips
+        document.querySelectorAll('.coverage-strip').forEach(el => el.remove());
+
+        if (Object.keys(coverageMap).length === 0) return;
+
+        // Get the pixel height of a single 1-hour slot
+        const slotEl = document.querySelector('.fc-timegrid-slot[data-time]');
+        if (!slotEl) return;
+        const slotHeight = slotEl.offsetHeight;
+        if (!slotHeight) return;
+
+        // slotMinTime is '06:00:00' → hour offset base
+        const minHour = 6;
+
+        document.querySelectorAll('.fc-timegrid-col[data-date]').forEach(col => {
+            const dateStr = col.getAttribute('data-date');
+            const dayData = coverageMap[dateStr];
+            if (!dayData) return;
+
+            const frame = col.querySelector('.fc-timegrid-col-frame');
+            if (!frame) return;
+            // Ensure the frame is a positioned container
+            if (getComputedStyle(frame).position === 'static') {
+                frame.style.position = 'relative';
+            }
+
+            Object.entries(dayData).forEach(([hourStr, color]) => {
+                const hour = parseInt(hourStr);
+                const strip = document.createElement('div');
+                strip.className = 'coverage-strip';
+                strip.style.top    = `${(hour - minHour) * slotHeight}px`;
+                strip.style.height = `${slotHeight}px`;
+                strip.style.background = color;
+                frame.appendChild(strip);
+            });
+        });
+    }
+
+    /* =========================================================
+       FULLCALENDAR SETUP
+       ========================================================= */
+    function getCurrentBranch() {
+        const el = document.getElementById('branchFilter');
+        return el ? el.value : '';
+    }
+
+    function initCalendar() {
+        const el = document.getElementById('calendar');
+        if (!el) return;
+
+        calendar = new FullCalendar.Calendar(el, {
+            initialView:  'timeGridWeek',
+            headerToolbar: {
+                left:   'prev,next today',
+                center: 'title',
+                right:  'timeGridWeek,timeGridDay'
+            },
+            allDaySlot:   false,
+            selectable:   viewType === 'admin',
+            selectMirror: true,
+            slotMinTime:  '06:00:00',
+            slotMaxTime:  '24:00:00',
+
+            /* Fetch events AND rebuild strips */
+            events: function(fetchInfo, successCallback, failureCallback) {
+                const branch = getCurrentBranch();
+                fetch(`/api/events?branch=${encodeBranch(branch)}`)
+                    .then(r => r.ok ? r.json() : Promise.reject('API error'))
+                    .then(data => {
+                        renderDailyTotals(data);
+                        buildCoverageMap(data);
+                        successCallback(data);
+                        // Wait for FullCalendar to paint, then inject strips
+                        requestAnimationFrame(() => setTimeout(injectCoverageStrips, 80));
+                    })
+                    .catch(err => {
+                        console.error(err);
+                        failureCallback(err);
+                    });
+            },
+
+            /* Re-inject strips after calendar navigates (prev/next week) */
+            datesSet: function() {
+                // Clear stale strips; fresh ones come after the events fetch resolves
+                document.querySelectorAll('.coverage-strip').forEach(el => el.remove());
+            },
+
+            /* Re-inject on window resize (slot heights change) */
+            windowResize: function() {
+                requestAnimationFrame(() => setTimeout(injectCoverageStrips, 100));
+            },
+
+            select: function(info) {
+                if (viewType !== 'admin') return;
+                const branch = getCurrentBranch();
+                if (!branch) { alert('Select a Branch first!'); calendar.unselect(); return; }
+                openShiftModal(null, info.startStr, info.endStr);
+            },
+
+            eventClick: function(info) {
+                const props = info.event.extendedProps;
+                if (viewType === 'admin' && props.type === 'shift') {
+                    openShiftModal(info.event);
+                } else if (viewType === 'supervisor' && props.type === 'shift') {
+                    alert(
+                        `Shift: ${info.event.title}\n` +
+                        `Supervisor: ${props.supervisor || 'Not set'}\n` +
+                        `Assignee: ${props.assigned_to || 'Needs Assignment'}\n` +
+                        `Description: ${props.description || 'N/A'}`
+                    );
+                }
+            },
+
+            eventDidMount: function(info) {
+                if (viewType === 'supervisor' && info.event.extendedProps?.type === 'shift') {
+                    const el = info.el;
+                    el.addEventListener('dragover',  e => { e.preventDefault(); el.style.opacity = '0.7'; });
+                    el.addEventListener('dragleave', ()  => { el.style.opacity = '1'; });
+                    el.addEventListener('drop', e => {
+                        e.preventDefault();
+                        el.style.opacity = '1';
+                        const empId   = e.dataTransfer.getData('empId');
+                        const empName = e.dataTransfer.getData('empName');
+                        const shiftId = info.event.id.replace('shift_', '');
+                        if (!empId || !confirm(`Assign ${empName} to this shift?`)) return;
+
+                        apiFetch(`/api/shifts/${shiftId}/assign`, {
+                            method: 'POST',
+                            body: JSON.stringify({ emp_id: empId, emp_name: empName })
+                        })
+                        .then(() => calendar.refetchEvents())
+                        .catch(err => alert('Assignment failed: ' + err.message));
+                    });
+                }
+            }
+        });
+
+        calendar.render();
+
+        if (viewType === 'supervisor') {
+            calendar.refetchEvents();
+        }
+    }
+
+    /* =========================================================
+       ADMIN SHIFT MODAL LOGIC
+       ========================================================= */
+    function openShiftModal(event = null, startStr = null, endStr = null) {
+        const modal  = document.getElementById('shiftModal');
+        if (!modal) return;
+
+        const header  = document.getElementById('modalHeader');
+        const idInput = document.getElementById('shiftId');
+        const titleIn = document.getElementById('shiftTitle');
+        const descIn  = document.getElementById('shiftDescription');
+        const startIn = document.getElementById('shiftStart');
+        const endIn   = document.getElementById('shiftEnd');
+        const delBtn  = document.getElementById('btnDeleteShift');
+
+        modal.classList.remove('hidden');
+
+        if (event) {
+            header.textContent   = 'Edit Official Shift';
+            idInput.value        = event.id.replace('shift_', '');
+            titleIn.value        = event.title;
+            descIn.value         = event.extendedProps.description || '';
+            startIn.value        = formatForInput(event.startStr);
+            endIn.value          = formatForInput(event.endStr);
+            delBtn.classList.remove('hidden');
+        } else {
+            header.textContent   = 'Draw Official Shift';
+            idInput.value        = '';
+            titleIn.value        = '';
+            descIn.value         = '';
+            startIn.value        = formatForInput(startStr);
+            endIn.value          = formatForInput(endStr);
+            delBtn.classList.add('hidden');
+        }
+    }
+
+    function closeShiftModal() {
+        const modal = document.getElementById('shiftModal');
+        if (modal) modal.classList.add('hidden');
+        if (calendar) calendar.unselect();
+    }
+
+    /* Quick-fill helpers */
+    function fillShiftTime(startTime, endTime) {
+        const startIn = document.getElementById('shiftStart');
+        const endIn   = document.getElementById('shiftEnd');
+        if (!startTime || !endTime) {
+            alert('No shift times configured for this branch yet. Use the "Shift Times" button to set them.');
+            return;
+        }
+        // Keep the date from whatever is already in the start field, or today
+        const datePart = (startIn.value || new Date().toISOString()).split('T')[0];
+        startIn.value = `${datePart}T${startTime}`;
+        endIn.value   = `${datePart}T${endTime}`;
+    }
+
+    async function saveShift() {
+        const branch   = getCurrentBranch();
+        const id       = document.getElementById('shiftId').value;
+        const startVal = document.getElementById('shiftStart').value + ':00';
+        const endVal   = document.getElementById('shiftEnd').value   + ':00';
+
+        const payload = {
+            branch:      branch,
+            title:       document.getElementById('shiftTitle').value,
+            description: document.getElementById('shiftDescription').value,
+            start:       startVal,
+            end:         endVal
+        };
+
+        try {
+            if (id) {
+                await apiFetch(`/api/shifts/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
+            } else {
+                await apiFetch(`/api/shifts`, { method: 'POST', body: JSON.stringify(payload) });
+            }
+            closeShiftModal();
+            calendar.refetchEvents();
+        } catch (err) {
+            alert('Save failed: ' + err.message);
+        }
+    }
+
+    async function deleteShift() {
+        const id = document.getElementById('shiftId').value;
+        if (!id || !confirm('Delete this shift?')) return;
+        try {
+            await apiFetch(`/api/shifts/${id}`, { method: 'DELETE' });
+            closeShiftModal();
+            calendar.refetchEvents();
+        } catch (err) {
+            alert('Delete failed: ' + err.message);
+        }
+    }
+
+    async function approveDrafts() {
+        const branch = getCurrentBranch();
+        const msg = branch ? `Publish all Drafts for ${branch}?` : 'Publish all Drafts across all branches?';
+        if (!confirm(msg)) return;
+        try {
+            await apiFetch('/api/shifts/approve_all', { method: 'POST', body: JSON.stringify({ branch }) });
+            calendar.refetchEvents();
+        } catch (err) {
+            alert('Publish failed: ' + err.message);
+        }
+    }
+
+    /* =========================================================
+       BRANCH SHIFT TIMES SETTINGS MODAL
+       ========================================================= */
+    function openShiftTimesModal() {
+        const modal  = document.getElementById('shiftTimesModal');
+        const branch = getCurrentBranch();
+        if (!modal || !branch) return;
+
+        document.getElementById('shiftTimesModalBranch').textContent =
+            `Branch: ${branch}`;
+        document.getElementById('stMorningStart').value = branchShiftTimes.morning_shift_start || '';
+        document.getElementById('stMorningEnd').value   = branchShiftTimes.morning_shift_end   || '';
+        document.getElementById('stEveningStart').value = branchShiftTimes.evening_shift_start || '';
+        document.getElementById('stEveningEnd').value   = branchShiftTimes.evening_shift_end   || '';
+
+        modal.classList.remove('hidden');
+    }
+
+    function closeShiftTimesModal() {
+        const modal = document.getElementById('shiftTimesModal');
+        if (modal) modal.classList.add('hidden');
+    }
+
+    async function saveShiftTimes() {
+        const branch = getCurrentBranch();
+        if (!branch) return;
+
+        const payload = {
+            morning_shift_start: document.getElementById('stMorningStart').value || null,
+            morning_shift_end:   document.getElementById('stMorningEnd').value   || null,
+            evening_shift_start: document.getElementById('stEveningStart').value || null,
+            evening_shift_end:   document.getElementById('stEveningEnd').value   || null
+        };
+
+        try {
+            await apiFetch(`/api/branch_info/${encodeBranch(branch)}`, {
+                method: 'PUT',
+                body: JSON.stringify(payload)
+            });
+            // Update local cache
+            branchShiftTimes = payload;
+            closeShiftTimesModal();
+
+            const hint = document.getElementById('quickFillHint');
+            if (hint) hint.classList.add('hidden');
+
+            alert('Shift times saved!');
+        } catch (err) {
+            alert('Save failed: ' + err.message);
+        }
+    }
+
+    /* =========================================================
+       EVENT LISTENERS
+       ========================================================= */
+    function initListeners() {
+        // Branch filter
+        const branchFilter = document.getElementById('branchFilter');
+        if (branchFilter) {
+            branchFilter.addEventListener('change', function() {
+                const branch = this.value;
+                if (calendar) calendar.refetchEvents();
+                loadBranchInfo(branch);
+
+                // Disable settings button if no branch selected
+                const btnST = document.getElementById('btnShiftTimes');
+                if (btnST && !branch) {
+                    btnST.disabled = true;
+                    btnST.classList.add('text-slate-400', 'cursor-not-allowed');
+                    btnST.classList.remove('text-slate-700', 'hover:bg-slate-200', 'cursor-pointer');
+                }
+            });
+        }
+
+        // Approve button
+        const btnApprove = document.getElementById('btnApprove');
+        if (btnApprove) btnApprove.addEventListener('click', approveDrafts);
+
+        // Shift modal buttons
+        const btnSave   = document.getElementById('btnSaveShift');
+        const btnDelete = document.getElementById('btnDeleteShift');
+        const btnCancel = document.getElementById('btnCancelShift');
+        if (btnSave)   btnSave.addEventListener('click', saveShift);
+        if (btnDelete) btnDelete.addEventListener('click', deleteShift);
+        if (btnCancel) btnCancel.addEventListener('click', closeShiftModal);
+
+        // Quick-fill buttons
+        const btnMorning = document.getElementById('btnFillMorning');
+        const btnEvening = document.getElementById('btnFillEvening');
+        if (btnMorning) btnMorning.addEventListener('click', () =>
+            fillShiftTime(branchShiftTimes.morning_shift_start, branchShiftTimes.morning_shift_end));
+        if (btnEvening) btnEvening.addEventListener('click', () =>
+            fillShiftTime(branchShiftTimes.evening_shift_start, branchShiftTimes.evening_shift_end));
+
+        // Shift modal backdrop
+        const modal = document.getElementById('shiftModal');
+        if (modal) modal.addEventListener('click', e => { if (e.target === modal) closeShiftModal(); });
+
+        // Shift times settings button
+        const btnST = document.getElementById('btnShiftTimes');
+        if (btnST) btnST.addEventListener('click', openShiftTimesModal);
+
+        // Shift times modal buttons
+        const btnSaveST   = document.getElementById('btnSaveShiftTimes');
+        const btnCancelST = document.getElementById('btnCancelShiftTimes');
+        if (btnSaveST)   btnSaveST.addEventListener('click', saveShiftTimes);
+        if (btnCancelST) btnCancelST.addEventListener('click', closeShiftTimesModal);
+
+        // Shift times modal backdrop
+        const stModal = document.getElementById('shiftTimesModal');
+        if (stModal) stModal.addEventListener('click', e => { if (e.target === stModal) closeShiftTimesModal(); });
+    }
+
+    /* =========================================================
+       BOOT
+       ========================================================= */
+    document.addEventListener('DOMContentLoaded', function() {
+        initEmployeeList();
+        initCalendar();
+        initListeners();
+
+        {% if view_type == 'supervisor' and current_user.branch_name %}
+            loadBranchInfo('{{ current_user.branch_name }}');
+        {% endif %}
+    });
+})();
+</script>
+{% endblock %}

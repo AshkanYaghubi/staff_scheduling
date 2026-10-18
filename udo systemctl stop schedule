@@ -1,0 +1,18 @@
+[0;1;31m×[0m schedule.service - Gunicorn instance to serve Schedule App
+     Loaded: loaded (]8;;file://Ubuntu-2404-Server/etc/systemd/system/schedule.service/etc/systemd/system/schedule.service]8;;; [0;1;32menabled[0m; preset: [0;1;32menabled[0m)
+     Active: [0;1;31mfailed[0m (Result: exit-code) since Sat 2026-05-09 02:35:36 +0330; 1min 10s ago
+   Duration: 1.395s
+    Process: 44297 ExecStart=/root/schedule/venv/bin/gunicorn --workers 2 --bind 127.0.0.1:4242 app:app [0;1;31m(code=exited, status=3)[0m
+   Main PID: 44297 (code=exited, status=3)
+        CPU: 2.357s
+
+May 09 02:35:35 Ubuntu-2404-Server gunicorn[44299]: (X86_V2) but your machine doesn't support:
+May 09 02:35:35 Ubuntu-2404-Server gunicorn[44299]: (X86_V2).
+May 09 02:35:35 Ubuntu-2404-Server gunicorn[44299]: [2026-05-09 02:35:35 +0330] [44299] [INFO] Worker exiting (pid: 44299)
+May 09 02:35:35 Ubuntu-2404-Server gunicorn[44297]: [2026-05-09 02:35:35 +0330] [44297] [ERROR] Worker (pid:44299) exited with code 3.
+May 09 02:35:35 Ubuntu-2404-Server gunicorn[44297]: [2026-05-09 02:35:35 +0330] [44297] [INFO] Worker (pid:44298) was sent SIGTERM!
+May 09 02:35:36 Ubuntu-2404-Server gunicorn[44297]: [2026-05-09 02:35:36 +0330] [44297] [ERROR] Shutting down: Master
+May 09 02:35:36 Ubuntu-2404-Server gunicorn[44297]: [2026-05-09 02:35:36 +0330] [44297] [ERROR] Reason: Worker failed to boot.
+May 09 02:35:36 Ubuntu-2404-Server systemd[1]: [0;1;39m[0;1;31m[0;1;39mschedule.service: Main process exited, code=exited, status=3/NOTIMPLEMENTED[0m
+May 09 02:35:36 Ubuntu-2404-Server systemd[1]: [0;1;38;5;185m[0;1;39m[0;1;38;5;185mschedule.service: Failed with result 'exit-code'.[0m
+May 09 02:35:36 Ubuntu-2404-Server systemd[1]: schedule.service: Consumed 2.357s CPU time.

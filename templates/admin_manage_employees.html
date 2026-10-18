@@ -1,0 +1,291 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="max-w-6xl mx-auto mt-10">
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-8">
+        <h2 class="text-2xl font-bold text-slate-800 mb-2">Step 2: Manage Employee Access</h2>
+        <p class="text-slate-500 mb-6">Create or update application accounts using the employee data from the <a href="{{ url_for('admin_core_data_management') }}" class="text-blue-600 font-semibold hover:underline">"Manage Core Data"</a> page.</p>
+
+        <form method="POST" action="{{ url_for('admin_manage_employees') }}" class="mb-8" onsubmit="return confirmSync()">
+            <input type="hidden" name="action" value="sync">
+            <button type="submit" class="bg-green-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-green-700 transition flex items-center shadow-md">
+                <i class="fa-solid fa-play-circle mr-2"></i> Sync from Editable Data
+            </button>
+            <p class="text-sm text-slate-500 mt-2">Supervisors default password: Medici1230</p>
+        </form>
+
+        <!-- Info box about exclusions -->
+        <div class="bg-amber-50 border-l-4 border-amber-400 p-4 mb-6 rounded-r-lg">
+            <div class="flex">
+                <div class="py-1"><i class="fa-solid fa-shield-alt text-amber-500 mr-3"></i></div>
+                <div>
+                    <p class="font-bold text-amber-800">Auto-Exclusion Rules</p>
+                    <p class="text-sm text-amber-700">The sync process automatically excludes:</p>
+                    <ul class="text-sm text-amber-700 list-disc list-inside mt-1">
+                        <li>Managers of education and execution departments</li>
+                        <li>Specific excluded employee numbers (configured by admin)</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <h3 class="text-xl font-bold text-slate-800 mb-4 border-t pt-8 mt-8">App Access Accounts</h3>
+        
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="mb-4 p-4 rounded-lg {% if category == 'success' %}bg-green-100 text-green-800{% else %}bg-red-100 text-red-800{% endif %}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <!-- Search and Filter Bar -->
+        <div class="mb-6 bg-slate-50 p-4 rounded-lg">
+            <form method="GET" action="{{ url_for('admin_manage_employees') }}" class="flex flex-wrap gap-4">
+                <div class="flex-1 min-w-[200px]">
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Search</label>
+                    <div class="relative">
+                        <i class="fa-solid fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400"></i>
+                        <input type="text" name="search" value="{{ current_search }}" 
+                               placeholder="Search by employee #, name, or role..."
+                               class="w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    </div>
+                </div>
+                <div class="w-48">
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Role</label>
+                    <select name="role" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <option value="">All Roles</option>
+                        <option value="barista" {% if current_role_filter == 'barista' %}selected{% endif %}>Barista</option>
+                        <option value="supervisor" {% if current_role_filter == 'supervisor' %}selected{% endif %}>Supervisor</option>
+                    </select>
+                </div>
+                <div class="w-64">
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Branch</label>
+                    <select name="department" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <option value="">All Branches</option>
+                        {% for dept in all_departments %}
+                            <option value="{{ dept.id }}" {% if current_department_filter|string == dept.id|string %}selected{% endif %}>
+                                {{ dept.name }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="flex items-end gap-2">
+                    <button type="submit" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition">
+                        <i class="fa-solid fa-filter mr-2"></i>Apply Filters
+                    </button>
+                    <a href="{{ url_for('admin_manage_employees') }}" class="bg-slate-300 text-slate-700 px-6 py-2 rounded-lg hover:bg-slate-400 transition">
+                        <i class="fa-solid fa-undo mr-2"></i>Reset
+                    </a>
+                </div>
+            </form>
+            {% if total_count is defined %}
+                <div class="mt-3 text-sm text-slate-600">
+                    <i class="fa-solid fa-users mr-1"></i> Showing <strong>{{ auth_employees|length }}</strong> of <strong>{{ total_count }}</strong> employees
+                </div>
+            {% endif %}
+        </div>
+
+        {% if auth_employees %}
+        <div class="overflow-x-auto">
+            <table class="min-w-full bg-white border-collapse">
+                <thead>
+                    <tr class="bg-slate-100 text-left text-sm font-semibold text-slate-700">
+                        <th class="px-4 py-3 border-b-2 border-slate-200 rounded-tl-lg">Employee No.</th>
+                        <th class="px-4 py-3 border-b-2 border-slate-200">Full Name</th>
+                        <th class="px-4 py-3 border-b-2 border-slate-200">Role</th>
+                        <th class="px-4 py-3 border-b-2 border-slate-200">Branch</th>
+                        <th class="px-4 py-3 border-b-2 border-slate-200 rounded-tr-lg text-center">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for emp in auth_employees %}
+                    <tr class="border-b border-slate-100 hover:bg-slate-50">
+                        <td class="px-4 py-3 text-sm text-slate-800">{{ emp.employee_number }}</td>
+                        <td class="px-4 py-3 text-sm text-slate-800">{{ emp.full_name }}</td>
+                        <td class="px-4 py-3 text-sm">
+                            <span class="px-2 py-1 rounded-full text-xs font-medium {% if emp.role == 'supervisor' %}bg-purple-100 text-purple-800{% else %}bg-blue-100 text-blue-800{% endif %}">
+                                {{ emp.role|capitalize }}
+                            </span>
+                        </td>
+                        <td class="px-4 py-3 text-sm text-slate-800">{{ department_names.get(emp.department_id, 'N/A') }}</td>
+                        <td class="px-4 py-3 text-center">
+                            <button onclick="openResetPasswordModal('{{ emp.employee_number }}', '{{ emp.full_name }}')"
+                                    class="text-blue-600 hover:text-blue-800 px-2 py-1 rounded text-sm font-medium transition">
+                                <i class="fa-solid fa-key mr-1"></i> Reset Pass
+                            </button>
+                            <button onclick="deleteEmployeeAccess('{{ emp.employee_number }}', '{{ emp.full_name }}')"
+                                    class="text-red-600 hover:text-red-800 px-2 py-1 rounded text-sm font-medium transition ml-2">
+                                <i class="fa-solid fa-trash mr-1"></i> Remove
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        {% if pagination and pagination.pages > 1 %}
+        <div class="flex justify-between items-center mt-6 pt-4 border-t border-slate-200">
+            <div class="text-sm text-slate-600">
+                Page {{ pagination.page }} of {{ pagination.pages }}
+            </div>
+            <div class="flex gap-2">
+                {% if pagination.has_prev %}
+                    <a href="{{ url_for('admin_manage_employees', page=pagination.prev_num, search=current_search, role=current_role_filter, department=current_department_filter) }}" 
+                       class="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition">
+                        <i class="fa-solid fa-chevron-left mr-1"></i> Previous
+                    </a>
+                {% else %}
+                    <button disabled class="px-4 py-2 bg-slate-50 text-slate-400 rounded-lg cursor-not-allowed">
+                        <i class="fa-solid fa-chevron-left mr-1"></i> Previous
+                    </button>
+                {% endif %}
+                
+                {% for page_num in range(pagination.page - 2, pagination.page + 3) %}
+                    {% if page_num > 0 and page_num <= pagination.pages %}
+                        {% if page_num == pagination.page %}
+                            <button disabled class="px-4 py-2 bg-blue-600 text-white rounded-lg cursor-not-allowed">{{ page_num }}</button>
+                        {% else %}
+                            <a href="{{ url_for('admin_manage_employees', page=page_num, search=current_search, role=current_role_filter, department=current_department_filter) }}" 
+                               class="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition">
+                                {{ page_num }}
+                            </a>
+                        {% endif %}
+                    {% endif %}
+                {% endfor %}
+                
+                {% if pagination.has_next %}
+                    <a href="{{ url_for('admin_manage_employees', page=pagination.next_num, search=current_search, role=current_role_filter, department=current_department_filter) }}" 
+                       class="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition">
+                        Next <i class="fa-solid fa-chevron-right ml-1"></i>
+                    </a>
+                {% else %}
+                    <button disabled class="px-4 py-2 bg-slate-50 text-slate-400 rounded-lg cursor-not-allowed">
+                        Next <i class="fa-solid fa-chevron-right ml-1"></i>
+                    </button>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+        
+        {% else %}
+        <p class="text-slate-500">No employees have been imported for app access yet. Click "Sync from Editable Data" above.</p>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Reset Password Modal -->
+<div id="resetPasswordModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden flex justify-center items-center z-50">
+    <div class="bg-white rounded-2xl p-6 w-[400px] shadow-2xl transition-transform">
+        <h3 class="text-xl font-bold text-slate-800 mb-1">Reset Password</h3>
+        <p class="text-slate-500 text-sm mb-6">for <strong id="resetEmployeeName"></strong> (<span id="resetEmployeeNumber"></span>)</p>
+        <input type="hidden" id="resetEmpNumInput">
+        <div class="mb-4">
+            <label class="block text-sm font-semibold text-slate-700 mb-1">New Password</label>
+            <input type="password" id="newPassword" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+            <p class="text-xs text-slate-500 mt-1">Leave empty to auto-generate from phone number</p>
+        </div>
+        <div class="mb-6">
+            <label class="block text-sm font-semibold text-slate-700 mb-1">Confirm New Password</label>
+            <input type="password" id="confirmPassword" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+        </div>
+        <div class="flex justify-end gap-3">
+            <button onclick="closeResetPasswordModal()" class="bg-slate-100 text-slate-600 font-bold py-2 px-4 rounded-lg hover:bg-slate-200 transition">Cancel</button>
+            <button onclick="submitResetPassword()" class="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition">Set Password</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    function confirmSync() {
+        return confirm('Warning: This will sync all non-manager employees from the editable data. Existing accounts will be updated. Continue?');
+    }
+    
+    function openResetPasswordModal(employeeNumber, fullName) { 
+        document.getElementById('resetEmployeeName').innerText = fullName; 
+        document.getElementById('resetEmployeeNumber').innerText = employeeNumber; 
+        document.getElementById('resetEmpNumInput').value = employeeNumber; 
+        document.getElementById('newPassword').value = ''; 
+        document.getElementById('confirmPassword').value = ''; 
+        document.getElementById('resetPasswordModal').classList.remove('hidden'); 
+    }
+    
+    function closeResetPasswordModal() { 
+        document.getElementById('resetPasswordModal').classList.add('hidden'); 
+    }
+    
+    async function submitResetPassword() { 
+        const employeeNumber = document.getElementById('resetEmpNumInput').value; 
+        const newPassword = document.getElementById('newPassword').value; 
+        const confirmPassword = document.getElementById('confirmPassword').value; 
+        
+        if (newPassword !== confirmPassword) { 
+            alert('New password and confirm password do not match!'); 
+            return; 
+        }
+        
+        if (!newPassword) { 
+            alert('Password cannot be empty!'); 
+            return; 
+        }
+        
+        if (newPassword.length < 4) {
+            alert('Password must be at least 4 characters long!');
+            return;
+        }
+        
+        try { 
+            const response = await fetch(`/api/employees/${employeeNumber}/reset_password`, { 
+                method: 'PUT', 
+                headers: { 'Content-Type': 'application/json' }, 
+                body: JSON.stringify({ password: newPassword }) 
+            }); 
+            const data = await response.json(); 
+            if (response.ok) { 
+                alert(data.message); 
+                closeResetPasswordModal(); 
+            } else { 
+                alert('Error resetting password: ' + data.error); 
+            } 
+        } catch (error) { 
+            console.error('Fetch error:', error); 
+            alert('An error occurred while resetting the password.'); 
+        } 
+    }
+    
+    async function deleteEmployeeAccess(employeeNumber, fullName) { 
+        if (!confirm(`Are you sure you want to remove app access for ${fullName} (${employeeNumber})? This will not delete them from the core system.`)) { 
+            return; 
+        } 
+        try { 
+            const response = await fetch(`/api/employees/${employeeNumber}/delete`, { 
+                method: 'DELETE', 
+                headers: { 'Content-Type': 'application/json' } 
+            }); 
+            const data = await response.json(); 
+            if (response.ok) { 
+                alert(data.message); 
+                location.reload(); 
+            } else { 
+                alert('Error removing access: ' + data.error); 
+            } 
+        } catch (error) { 
+            console.error('Fetch error:', error); 
+            alert('An error occurred while removing access.'); 
+        } 
+    }
+    
+    // Debounced search for better UX
+    let searchTimeout;
+    const searchInput = document.querySelector('input[name="search"]');
+    if(searchInput) {
+        searchInput.addEventListener('input', function(e) {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                this.form.submit();
+            }, 500);
+        });
+    }
+</script>
+{% endblock %}

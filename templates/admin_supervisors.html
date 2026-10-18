@@ -1,0 +1,567 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="max-w-6xl mx-auto px-4 py-8">
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+        <div>
+            <h2 class="text-3xl font-extrabold text-slate-800 flex items-center gap-3">
+                <i class="fa-solid fa-user-shield text-amber-500"></i> Supervisor Accounts
+            </h2>
+            <p class="text-slate-500 mt-1">Manage logins, view plain-text passwords, and export supervisor credentials PDF certificates.</p>
+        </div>
+        <div class="w-full md:w-auto relative">
+            <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                <i class="fa-solid fa-magnifying-glass"></i>
+            </span>
+            <input type="text" id="supervisorSearch" placeholder="Search by name or branch..." 
+                   class="w-full md:w-80 pl-10 pr-4 py-2 border border-slate-300 rounded-lg shadow-sm focus:ring-2 focus:ring-amber-500 outline-none transition text-sm">
+        </div>
+    </div>
+
+    <!-- Table Card -->
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full border-collapse text-left text-sm text-slate-600">
+                <thead>
+                    <tr class="bg-slate-50 border-b border-slate-100 font-bold text-slate-700 uppercase tracking-wider">
+                        <th class="px-6 py-4">Full Name</th>
+                        <th class="px-6 py-4">Assigned Branch / Department</th>
+                        <th class="px-6 py-4">Password (Plain-Text)</th>
+                        <th class="px-6 py-4 text-center">Export Credentials</th>
+                    </tr>
+                </thead>
+                <tbody id="supervisorTableBody" class="divide-y divide-slate-100">
+                    {% for s in supervisors %}
+                    {% set branch_name = departments.get(s.department_id, "Unassigned Department") %}
+                    <tr class="hover:bg-slate-50/50 transition supervisor-row">
+                        <!-- Column 1: Full Name -->
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-full bg-gradient-to-tr from-amber-400 to-amber-600 text-white flex items-center justify-center font-bold shadow-sm">
+                                    {{ s.full_name[0] }}
+                                </div>
+                                <div>
+                                    <span class="font-bold text-slate-800 block text-base search-name">{{ s.full_name }}</span>
+                                    <span class="text-xs text-slate-400 font-medium tracking-wide">ID: {{ s.employee_number }}</span>
+                                </div>
+                            </div>
+                        </td>
+
+                        <!-- Column 2: Branch -->
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="px-3 py-1.5 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200/50 uppercase search-branch">
+                                {{ branch_name }}
+                            </span>
+                        </td>
+
+                        <!-- Column 3: Plain Text Password -->
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="flex items-center gap-2 max-w-xs">
+                                <div class="relative flex-1">
+                                    <input type="password" id="pw-input-{{ s.id }}" value="{{ s.password_text or '' }}" 
+                                           placeholder="No password set"
+                                           class="w-full pl-3 pr-10 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm font-semibold font-mono tracking-wider outline-none focus:ring-2 focus:ring-amber-500 transition">
+                                    <button type="button" onclick="togglePasswordVisibility('{{ s.id }}')" 
+                                            class="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600">
+                                        <i class="fa-solid fa-eye" id="pw-eye-{{ s.id }}"></i>
+                                    </button>
+                                </div>
+                                <button onclick="saveSupervisorPassword('{{ s.id }}')" id="pw-btn-{{ s.id }}"
+                                        class="bg-emerald-500 hover:bg-emerald-600 text-white p-2 rounded-lg shadow-sm transition flex items-center justify-center" 
+                                        title="Save credentials">
+                                    <i class="fa-solid fa-floppy-disk text-sm"></i>
+                                </button>
+                            </div>
+                        </td>
+
+                        <!-- Column 4: Export PDF -->
+                        <td class="px-6 py-4 whitespace-nowrap text-center">
+                            <button onclick="exportSupervisorPDF('{{ s.employee_number }}', '{{ s.full_name|replace("'", "\\'") }}', '{{ branch_name|replace("'", "\\'") }}', '{{ s.id }}')"
+                                    class="inline-flex items-center gap-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/80 px-3.5 py-1.5 rounded-lg text-xs font-bold transition shadow-sm active:scale-95"
+                                    title="Export credentials & user guide PDF">
+                                <i class="fa-solid fa-file-pdf text-indigo-600 text-sm"></i>
+                                <span>Export PDF</span>
+                            </button>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="4" class="px-6 py-12 text-center text-slate-400">
+                            <div class="text-4xl mb-2">👤</div>
+                            <span class="text-sm">No supervisor accounts found in database.</span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    // =========================================================================
+    // CONFIGURATION: Set your Company Logo PNG URL below
+    // =========================================================================
+    const COMPANY_LOGO_URL = "https://cdn.barista.ir/Lamiz.png"; // <-- Change this to your logo PNG path or URL
+
+    // Search Filtering
+    document.getElementById('supervisorSearch')?.addEventListener('input', function(e) {
+        const query = e.target.value.toLowerCase().trim();
+        const rows = document.querySelectorAll('.supervisor-row');
+        
+        rows.forEach(row => {
+            const name = row.querySelector('.search-name').textContent.toLowerCase();
+            const branch = row.querySelector('.search-branch').textContent.toLowerCase();
+            if (name.includes(query) || branch.includes(query)) {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+            }
+        });
+    });
+
+    // Plain Text Toggle Visibility
+    function togglePasswordVisibility(id) {
+        const input = document.getElementById(`pw-input-${id}`);
+        const eye = document.getElementById(`pw-eye-${id}`);
+        if (!input || !eye) return;
+
+        if (input.type === 'password') {
+            input.type = 'text';
+            eye.classList.remove('fa-eye');
+            eye.classList.add('fa-eye-slash');
+        } else {
+            input.type = 'password';
+            eye.classList.remove('fa-eye-slash');
+            eye.classList.add('fa-eye');
+        }
+    }
+
+    // Inline AJAX Save Action
+    async function saveSupervisorPassword(id) {
+        const input = document.getElementById(`pw-input-${id}`);
+        const btn = document.getElementById(`pw-btn-${id}`);
+        if (!input || !btn) return;
+
+        const originalHtml = btn.innerHTML;
+        const newPassword = input.value.trim();
+
+        if (!newPassword) {
+            alert('Password cannot be left blank.');
+            return;
+        }
+
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-sm"></i>';
+
+        try {
+            const res = await fetch(`/api/supervisors/${id}/update_password`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password: newPassword })
+            });
+            const data = await res.json();
+            
+            if (res.ok && data.success) {
+                input.classList.remove('border-slate-200');
+                input.classList.add('border-emerald-500', 'bg-emerald-50/30');
+                setTimeout(() => {
+                    input.classList.remove('border-emerald-500', 'bg-emerald-50/30');
+                    input.classList.add('border-slate-200');
+                }, 1500);
+            } else {
+                alert(data.error || 'Failed to save password.');
+            }
+        } catch (err) {
+            alert('A server communication error occurred.');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+        }
+    }
+
+    // Corrected Jalali Date Calculator
+    function getJalaliDate() {
+        const now = new Date();
+        const gy = now.getFullYear() - 1600;
+        const gm = now.getMonth();
+        const gd = now.getDate() - 1;
+
+        const g_d = [31,28,31,30,31,30,31,31,30,31,30,31];
+        const j_d = [31,31,31,31,31,31,30,30,30,30,30,29];
+
+        let g_dn = 365 * gy + Math.floor((gy + 3) / 4) - Math.floor((gy + 99) / 100) + Math.floor((gy + 399) / 400);
+        for (let i = 0; i < gm; ++i) g_dn += g_d[i];
+        if (gm > 1 && ((gy + 1600) % 4 === 0 && ((gy + 1600) % 100 !== 0 || (gy + 1600) % 400 === 0))) g_dn++;
+        g_dn += gd;
+
+        let j_dn = g_dn - 79;
+        let j_np = Math.floor(j_dn / 12053);
+        j_dn %= 12053;
+        let jy = 979 + 33 * j_np + 4 * Math.floor(j_dn / 1461);
+        j_dn %= 1461;
+
+        if (j_dn >= 366) {
+            jy += Math.floor((j_dn - 1) / 365);
+            j_dn = (j_dn - 1) % 365;
+        }
+
+        let jm = 0;
+        for (let i = 0; i < 12; i++) {
+            if (j_dn < j_d[i]) {
+                jm = i;
+                break;
+            }
+            j_dn -= j_d[i];
+        }
+        let jd = j_dn + 1;
+
+        const jMonths = ['فروردین','اردیبهشت','خرداد','تیر','مرداد','شهریور','مهر','آبان','آذر','دی','بهمن','اسفند'];
+        return `${jd} ${jMonths[jm]} ${jy}`;
+    }
+
+    // Export PDF Document Generator
+    function exportSupervisorPDF(empNumber, fullName, branchName, id) {
+        const input = document.getElementById(`pw-input-${id}`);
+        const password = input ? input.value.trim() : '—';
+        const currentDate = getJalaliDate();
+
+        const pdfWindow = window.open('', '_blank');
+        if (!pdfWindow) {
+            alert('Pop-up window blocked. Please allow pop-ups for this site to export PDF.');
+            return;
+        }
+
+        const htmlContent = `
+<!DOCTYPE html>
+<html dir="rtl" lang="fa">
+<head>
+    <meta charset="UTF-8">
+    <title>شناسنامه دسترسی و راهنمای سرپرست شعبه - ${fullName}</title>
+    <style>
+        @page {
+            size: A4 portrait;
+            margin: 12mm 16mm;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Vazirmatn', Tahoma, sans-serif;
+            color: #1E293B;
+            background: #FFF;
+            line-height: 1.6;
+            font-size: 12.5px;
+            padding: 10px;
+        }
+
+        /* HEADER */
+        .pdf-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 3px solid #D97706;
+            padding-bottom: 14px;
+            margin-bottom: 20px;
+        }
+        .header-meta {
+            font-size: 11px;
+            color: #475569;
+            width: 30%;
+        }
+        .header-meta strong {
+            color: #1E293B;
+        }
+        .header-logo {
+            text-align: center;
+            width: 40%;
+        }
+        .logo-img {
+            height: 55px;
+            width: auto;
+            max-width: 160px;
+            object-fit: contain;
+            margin-bottom: 6px;
+            display: inline-block;
+        }
+        .logo-title {
+            font-size: 14px;
+            font-weight: 800;
+            color: #1E293B;
+            letter-spacing: -0.2px;
+        }
+        .header-issuer {
+            font-size: 11px;
+            color: #475569;
+            text-align: left;
+            width: 30%;
+            line-height: 1.5;
+        }
+        .header-issuer strong {
+            color: #1E293B;
+            display: block;
+        }
+
+        /* WELCOME SECTION */
+        .welcome-box {
+            background: #F8FAFC;
+            border-right: 4px solid #F59E0B;
+            padding: 12px 16px;
+            border-radius: 6px;
+            margin-bottom: 18px;
+        }
+        .welcome-title {
+            font-size: 15px;
+            font-weight: 800;
+            color: #1E293B;
+            margin-bottom: 4px;
+        }
+        .welcome-text {
+            color: #475569;
+            font-size: 12.5px;
+        }
+
+        /* CREDENTIALS CARD */
+        .credentials-card {
+            background: #FFFBEB;
+            border: 1.5px solid #FCD34D;
+            border-radius: 10px;
+            padding: 16px;
+            margin-bottom: 22px;
+        }
+        .card-header-title {
+            font-size: 13.5px;
+            font-weight: 800;
+            color: #92400E;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .cred-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px 20px;
+        }
+        .cred-item {
+            background: #FFFFFF;
+            border: 1px solid #FDE68A;
+            padding: 8px 12px;
+            border-radius: 6px;
+        }
+        .cred-label {
+            font-size: 11px;
+            color: #B45309;
+            font-weight: 600;
+            margin-bottom: 2px;
+        }
+        .cred-value {
+            font-size: 14px;
+            font-weight: 800;
+            color: #1E293B;
+            direction: ltr;
+            text-align: right;
+            font-family: monospace, Tahoma, sans-serif;
+        }
+        .cred-value.rtl {
+            direction: rtl;
+            font-family: 'Vazirmatn', Tahoma, sans-serif;
+        }
+
+        /* INSTRUCTIONS SECTION */
+        .section-title {
+            font-size: 14px;
+            font-weight: 800;
+            color: #1E293B;
+            margin-bottom: 12px;
+            padding-bottom: 4px;
+            border-bottom: 1px solid #E2E8F0;
+        }
+        
+        .rules-list {
+            list-style: none;
+            margin-bottom: 24px;
+        }
+        .rule-item {
+            position: relative;
+            padding-right: 22px;
+            margin-bottom: 12px;
+        }
+        .rule-item::before {
+            content: "•";
+            position: absolute;
+            right: 4px;
+            top: -2px;
+            color: #D97706;
+            font-size: 20px;
+            font-weight: bold;
+        }
+        .rule-heading {
+            font-weight: 700;
+            color: #1E293B;
+            font-size: 13px;
+        }
+        .rule-desc {
+            color: #475569;
+            font-size: 12px;
+            margin-top: 2px;
+            text-align: justify;
+        }
+
+        /* SIGNATURES */
+        .signatures {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 35px;
+            padding-top: 15px;
+            border-top: 1px dashed #CBD5E1;
+        }
+        .sig-box {
+            text-align: center;
+            width: 45%;
+        }
+        .sig-title {
+            font-size: 12px;
+            font-weight: 700;
+            color: #334155;
+            margin-bottom: 45px;
+        }
+        .sig-line {
+            border-bottom: 1px dotted #94A3B8;
+            width: 70%;
+            margin: 0 auto;
+        }
+
+        .pdf-footer-note {
+            margin-top: 20px;
+            text-align: center;
+            font-size: 10.5px;
+            color: #94A3B8;
+        }
+
+        @media print {
+            body { padding: 0; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- HEADER -->
+    <div class="pdf-header">
+        <div class="header-meta">
+            <div>تاریخ صدور: <strong>${currentDate}</strong></div>
+            <div>شماره پیگیری: <strong>SEC-${empNumber}</strong></div>
+        </div>
+        <div class="header-logo">
+            <img src="${COMPANY_LOGO_URL}" alt="Company Logo" class="logo-img" onerror="this.style.display='none';">
+            <div class="logo-title">سامانه مدیریت و شیفت‌بندی شعب لمیز</div>
+        </div>
+        <div class="header-issuer">
+            <div>صادرکننده:</div>
+            <strong>منابع انسانی</strong>
+            <strong>واحد برنامه‌ریزی و توسعه سیستم</strong>
+        </div>
+    </div>
+
+    <!-- WELCOME MESSAGE -->
+    <div class="welcome-box">
+        <div class="welcome-title">جناب آقای / سرکار خانم ${fullName}</div>
+        <div class="welcome-text">
+            با سلام و احترام؛ بدین‌وسیله اطلاعات حساب کاربری و شناسه دسترسی شما به عنوان سرپرست محترم شعبه <strong>«${branchName}»</strong> در سامانه شیفت‌بندی صادر می‌گردد.
+        </div>
+    </div>
+
+    <!-- CREDENTIALS CARD -->
+    <div class="credentials-card">
+        <div class="card-header-title">
+            🔐 مشخصات و اطلاعات ورود به سامانه
+        </div>
+        <div class="cred-grid">
+            <div class="cred-item">
+                <div class="cred-label">شعبه مربوطه</div>
+                <div class="cred-value rtl">${branchName}</div>
+            </div>
+            <div class="cred-item">
+                <div class="cred-label">نام کاربری (کد پرسنلی)</div>
+                <div class="cred-value">${empNumber}</div>
+            </div>
+            <div class="cred-item">
+                <div class="cred-label">کلمه عبور اختصاصی</div>
+                <div class="cred-value">${password}</div>
+            </div>
+            <div class="cred-item">
+                <div class="cred-label">سطح دسترسی</div>
+                <div class="cred-value rtl">سرپرست شعبه (Supervisor)</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- INSTRUCTIONS -->
+    <div class="section-title">
+        📋 دستورالعمل و راهنمای وظایف سرپرست در سامانه
+    </div>
+
+    <ul class="rules-list">
+        <li class="rule-item">
+            <div class="rule-heading">۱. بررسی و مشاهده شیفت‌های پیشنهادی</div>
+            <div class="rule-desc">
+                پس از ورود به حساب کاربری، شیفت‌های پیش‌فرض و میزان نیاز به باریستا برای هفته آینده (از شنبه تا جمعه) بر اساس پیش‌بینی فروش و پیک تردد مشتریان قرار گرفته است.
+            </div>
+        </li>
+        <li class="rule-item">
+            <div class="rule-heading">۲. چیدمان و تخصیص پرسنل شعب</div>
+            <div class="rule-desc">
+                جهت تکمیل شیفت‌ها، کارمندان شعبه خود را در ساعت‌های تعیین‌شده تخصیص دهید. در صورتی که با کمبود نیروی انسانی مواجه هستید، می‌توانید از قابلیت «جستجوی باریستای مهمان» جهت استفاده از پرسنل سایر شعب استفاده کنید.
+            </div>
+        </li>
+        <li class="rule-item">
+            <div class="rule-heading">۳. رعایت مهلت زمان‌بندی (Deadlines)</div>
+            <div class="rule-desc">
+                تنظیم و چیدمان شیفت‌ها باید حداکثر تا پایان مهلت قانونی تعیین‌شده توسط واحد منابع انسانی انجام پذیرد. پس از انقضای مهلت، سامانه به‌صورت خودکار قفل خواهد شد.
+            </div>
+        </li>
+        <li class="rule-item">
+            <div class="rule-heading">۴. تایید نهایی و ثبت رسمی برنامه</div>
+            <div class="rule-desc">
+                پس از اطمینان از تکمیل کامل شیفت‌های هفته، حتما دکمه «تایید نهایی و ارسال برنامه» را بفشارید تا برنامه هفته رسمیت یافته و جهت اجرا نهایی گردد.
+            </div>
+        </li>
+        <li class="rule-item">
+            <div class="rule-heading">۵. حفظ محرمانه بودن اطلاعات دسترسی</div>
+            <div class="rule-desc">
+                کلمه عبور ارائه شده اختصاصی بوده و مسئولیت تمامی تغییرات و ثبت شیفت‌ها با نام کاربری شما بر عهده سرپرست شعبه می‌باشد.
+            </div>
+        </li>
+    </ul>
+
+    <!-- SIGNATURES -->
+    <div class="signatures">
+        <div class="sig-box">
+            <div class="sig-title">تایید واحد برنامه‌ریزی و توسعه سیستم</div>
+            <div class="sig-line"></div>
+        </div>
+        <div class="sig-box">
+            <div class="sig-title">تایید واحد مدیریت منابع انسانی</div>
+            <div class="sig-line">میعاد زرین</div>
+        </div>
+    </div>
+
+    <div class="pdf-footer-note">
+        این برگه حاوی اطلاعات سازمانی است — سامانه مدیریت شیفت‌ شعب
+    </div>
+
+    <script>
+        window.onload = function() {
+            setTimeout(function() {
+                window.print();
+            }, 300);
+        };
+    <\/script>
+</body>
+</html>
+        `;
+
+        pdfWindow.document.write(htmlContent);
+        pdfWindow.document.close();
+    }
+</script>
+
+{% endblock %}

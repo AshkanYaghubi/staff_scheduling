@@ -1,0 +1,1321 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="fa">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>برنامه هفتگی</title>
+    <style>
+        :root {
+            --amber:       #F59E0B;
+            --amber-dark:  #D97706;
+            --amber-light: #FEF3C7;
+            --amber-pale:  #FFFBEB;
+            --navy:        #1E293B;
+            --navy-mid:    #334155;
+            --slate:       #64748B;
+            --border:      #E2E8F0;
+            --bg:          #F1F5F9;
+            --card:        #FFFFFF;
+            --green:       #10B981;
+            --red:         #EF4444;
+            --radius:      14px;
+            --shadow:      0 2px 12px rgba(0,0,0,0.07);
+            --shadow-lg:   0 8px 32px rgba(0,0,0,0.14);
+        }
+
+        * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+
+        body {
+            font-family: 'Vazirmatn', Tahoma, sans-serif;
+            background: var(--bg);
+            color: var(--navy);
+            min-height: 100svh;
+            padding-bottom: 120px;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* ======================== HEADER ======================== */
+        .header {
+            background: var(--navy);
+            position: sticky; top: 0; z-index: 100;
+            box-shadow: 0 2px 16px rgba(0,0,0,0.25);
+        }
+
+        .header-top {
+            display: flex; align-items: center;
+            justify-content: space-between;
+            padding: 14px 16px 8px;
+            gap: 10px;
+        }
+
+        .header-brand {
+            display: flex; align-items: center; gap: 10px; flex: 1;
+        }
+
+        .brand-icon {
+            width: 38px; height: 38px; border-radius: 10px;
+            background: linear-gradient(135deg, var(--amber), var(--amber-dark));
+            display: flex; align-items: center; justify-content: center;
+            font-size: 18px; flex-shrink: 0;
+        }
+
+        .brand-text { flex: 1; min-width: 0; }
+
+        .brand-title {
+            font-size: 15px; font-weight: 800; color: white;
+            letter-spacing: -0.3px;
+        }
+
+        .brand-sub {
+            font-size: 11px; color: var(--amber); margin-top: 1px;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+
+        .header-btns { display: flex; gap: 6px; }
+
+        .h-btn {
+            width: 36px; height: 36px; border-radius: 9px;
+            background: rgba(255,255,255,0.1);
+            border: none; color: white; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 16px; transition: background 0.15s;
+            text-decoration: none; flex-shrink: 0;
+        }
+        .h-btn:active { background: rgba(255,255,255,0.22); }
+
+        /* Admin branch selector */
+        .branch-bar {
+            padding: 0 16px 10px;
+            display: flex; gap: 8px; align-items: center;
+        }
+
+        .branch-select {
+            flex: 1; padding: 8px 12px;
+            border: 1.5px solid rgba(245,158,11,0.4);
+            border-radius: 9px; background: rgba(255,255,255,0.08);
+            color: white; font-family: inherit; font-size: 13px;
+            outline: none; cursor: pointer;
+        }
+
+        .branch-select option { background: var(--navy); color: white; }
+
+        /* Week nav */
+        .week-nav {
+            display: flex; align-items: center; gap: 8px;
+            padding: 0 16px 12px;
+        }
+
+        .nav-btn {
+            background: rgba(245,158,11,0.18);
+            border: 1.5px solid rgba(245,158,11,0.35);
+            color: var(--amber); padding: 7px 14px; border-radius: 20px;
+            font-family: inherit; font-size: 13px; font-weight: 600;
+            cursor: pointer; transition: all 0.15s; white-space: nowrap;
+        }
+        .nav-btn:active { background: rgba(245,158,11,0.35); transform: scale(0.96); }
+
+        .week-label {
+            flex: 1; text-align: center; font-size: 13px;
+            color: #CBD5E1; font-weight: 600;
+        }
+
+        /* ======================== DEADLINE ======================== */
+        .deadline-bar {
+            padding: 10px 16px; font-size: 13px; font-weight: 600;
+            display: flex; align-items: center; gap: 8px;
+            border-bottom: 2px solid transparent;
+        }
+        .deadline-bar.ok {
+            background: linear-gradient(135deg, #FFFBEB, #FEF3C7);
+            border-color: var(--amber); color: #78350F;
+        }
+        .deadline-bar.passed {
+            background: linear-gradient(135deg, #FFF1F2, #FFE4E6);
+            border-color: var(--red); color: #991B1B;
+        }
+        .deadline-bar.admin-pass {
+            background: linear-gradient(135deg, #EFF6FF, #DBEAFE);
+            border-color: #3B82F6; color: #1E3A8A;
+        }
+        .deadline-bar.hidden { display: none; }
+
+        /* ======================== VIEW TOGGLE ======================== */
+        .view-toggle-wrap { padding: 12px 16px 0; }
+        .view-toggle {
+            display: flex; background: var(--card); border-radius: 11px;
+            padding: 4px; box-shadow: var(--shadow);
+        }
+        .v-btn {
+            flex: 1; padding: 9px 0; border: none; background: transparent;
+            border-radius: 8px; font-family: inherit; font-size: 13px;
+            color: var(--slate); cursor: pointer; transition: all 0.2s;
+            display: flex; align-items: center; justify-content: center; gap: 5px;
+        }
+        .v-btn.active {
+            background: var(--navy); color: var(--amber);
+            font-weight: 700; box-shadow: 0 2px 8px rgba(30,41,59,0.3);
+        }
+
+        /* ======================== CARD VIEW ======================== */
+        .card-view { padding: 12px 14px 0; }
+
+        .day-card {
+            background: var(--card); border-radius: var(--radius);
+            margin-bottom: 12px; box-shadow: var(--shadow);
+            overflow: hidden; border: 1px solid var(--border);
+        }
+
+        .day-head {
+            background: var(--navy-mid);
+            padding: 11px 16px;
+            display: flex; align-items: center; justify-content: space-between;
+        }
+
+        .day-name-big { font-size: 16px; font-weight: 800; color: white; }
+        .day-jalali { font-size: 12px; color: var(--amber); font-weight: 600; }
+        .day-shift-count {
+            background: rgba(245,158,11,0.2); border-radius: 12px;
+            padding: 2px 8px; font-size: 11px; color: var(--amber); font-weight: 700;
+        }
+
+        .shift-row {
+            padding: 12px 16px; border-bottom: 1px solid var(--border);
+            display: flex; align-items: center; gap: 12px;
+            transition: background 0.12s;
+        }
+        .shift-row:last-child { border-bottom: none; }
+        .shift-row:active { background: var(--amber-pale); }
+
+        .shift-left { flex: 1; min-width: 0; }
+
+        .shift-title-txt {
+            font-size: 14px; font-weight: 700; color: var(--navy);
+        }
+
+        .shift-time-txt {
+            font-size: 12px; color: var(--slate); margin-top: 3px;
+            direction: ltr; text-align: right; font-variant-numeric: tabular-nums;
+        }
+
+        .shift-assigned-name {
+            font-size: 13px; font-weight: 600; color: var(--green);
+            margin-top: 4px; display: flex; align-items: center; gap: 4px;
+        }
+        .shift-assigned-name::before { content: '✓'; }
+
+        .shift-empty { font-size: 12px; color: #94A3B8; margin-top: 4px; }
+
+        .assign-pill {
+            background: var(--amber-light);
+            border: 1.5px solid var(--amber);
+            color: var(--amber-dark);
+            padding: 7px 14px; border-radius: 20px;
+            font-family: inherit; font-size: 13px; font-weight: 700;
+            cursor: pointer; white-space: nowrap;
+            transition: all 0.15s; flex-shrink: 0;
+        }
+        .assign-pill.assigned {
+            background: #ECFDF5; border-color: var(--green); color: #047857;
+        }
+        .assign-pill:active { transform: scale(0.94); opacity: 0.85; }
+        .assign-pill:disabled {
+            background: var(--border); border-color: var(--border);
+            color: var(--slate); cursor: not-allowed; transform: none;
+        }
+
+        /* ======================== TABLE VIEW ======================== */
+        .table-wrap {
+            overflow-x: auto; -webkit-overflow-scrolling: touch;
+            padding: 12px 14px 0; border-radius: 0;
+        }
+
+        .sched-table {
+            border-collapse: collapse; width: max-content; min-width: 100%;
+            background: var(--card); border-radius: var(--radius);
+            box-shadow: var(--shadow); font-size: 13px;
+            overflow: hidden;
+        }
+
+        .sched-table th {
+            background: var(--navy);
+            color: white; padding: 10px 12px;
+            text-align: center; font-weight: 700;
+            white-space: nowrap;
+            border-bottom: 2px solid var(--amber);
+            border-left: 1px solid var(--navy-mid);
+        }
+        .sched-table th:last-child { border-left: none; }
+
+        .day-th {
+            background: var(--amber) !important;
+            color: var(--navy) !important;
+            position: sticky; right: 0; z-index: 3;
+            min-width: 90px;
+            border-left: 2px solid var(--amber-dark) !important;
+        }
+
+        .sched-table td {
+            padding: 10px 12px; border: 1px solid var(--border);
+            text-align: center; vertical-align: middle; min-width: 130px;
+        }
+
+        .day-td {
+            background: var(--amber-pale) !important;
+            position: sticky; right: 0; z-index: 1;
+            border-right: 2px solid var(--amber) !important;
+            border-left: 1px solid var(--border);
+        }
+
+        .day-td-name { font-size: 14px; font-weight: 800; color: var(--navy); }
+        .day-td-date { font-size: 11px; color: var(--slate); margin-top: 2px; }
+
+        .sched-table tr:hover td:not(.day-td) { background: #FAFBFC; }
+
+        .emp-chip {
+            display: inline-flex; align-items: center; gap: 4px;
+            background: #ECFDF5; border: 1px solid #A7F3D0;
+            color: #065F46; padding: 4px 10px; border-radius: 20px;
+            font-size: 12px; font-weight: 600; margin: 2px;
+            cursor: pointer; transition: all 0.12s;
+        }
+        .emp-chip:active { opacity: 0.7; }
+
+        .add-chip {
+            display: inline-flex; align-items: center; gap: 3px;
+            background: var(--amber-light); border: 1.5px dashed var(--amber);
+            color: var(--amber-dark); padding: 4px 10px; border-radius: 20px;
+            font-size: 12px; font-weight: 600; cursor: pointer;
+            transition: all 0.12s;
+        }
+        .add-chip:active { opacity: 0.7; }
+
+        .empty-cell { color: #CBD5E1; font-size: 18px; }
+
+        /* ======================== STAFF SECTION ======================== */
+        .section-wrap { padding: 12px 14px 0; }
+
+        .section-card {
+            background: var(--card); border-radius: var(--radius);
+            box-shadow: var(--shadow); overflow: hidden;
+            border: 1px solid var(--border);
+        }
+
+        .section-head {
+            background: var(--navy);
+            padding: 13px 16px;
+            display: flex; align-items: center; gap: 8px;
+            color: white; font-size: 14px; font-weight: 800;
+        }
+        .section-head span { color: var(--amber); }
+
+        .staff-item {
+            padding: 12px 16px; border-bottom: 1px solid var(--border);
+            display: flex; align-items: center; gap: 12px;
+        }
+        .staff-item:last-child { border-bottom: none; }
+
+        .rank-badge {
+            width: 30px; height: 30px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 13px; font-weight: 800; flex-shrink: 0;
+        }
+        .rank-badge.r1 { background: #FEF3C7; color: #92400E; }
+        .rank-badge.r2 { background: #F1F5F9; color: var(--slate); }
+        .rank-badge.rn { background: #F8FAFC; color: #94A3B8; }
+
+        .staff-name-txt { flex: 1; font-size: 14px; font-weight: 600; }
+
+        .bar-wrap { display: flex; align-items: center; gap: 8px; }
+
+        .shift-bar-bg {
+            height: 8px; background: var(--border); border-radius: 4px;
+            width: 100px; overflow: hidden;
+        }
+        .shift-bar-fill {
+            height: 100%; background: linear-gradient(90deg, var(--amber-dark), var(--amber));
+            border-radius: 4px; transition: width 0.6s cubic-bezier(0.4,0,0.2,1);
+        }
+        .shift-count-num {
+            font-size: 15px; font-weight: 800; color: var(--amber-dark);
+            min-width: 22px; text-align: center;
+        }
+
+        /* ======================== EXPORT SECTION ======================== */
+        .export-wrap { padding: 12px 14px 0; display: flex; gap: 10px; }
+
+        .finalize-wrap { padding: 12px 14px 0; margin-bottom: 8px; }
+
+        .export-btn {
+            flex: 1; background: var(--navy); color: white;
+            border: none; padding: 14px; border-radius: var(--radius);
+            font-family: inherit; font-size: 14px; font-weight: 700;
+            cursor: pointer; display: flex; align-items: center;
+            justify-content: center; gap: 8px; transition: all 0.15s;
+            box-shadow: 0 4px 12px rgba(30,41,59,0.3);
+        }
+        .export-btn:active { transform: scale(0.97); opacity: 0.9; }
+
+        .finalize-btn {
+            width: 100%; background: var(--green); color: white;
+            border: none; padding: 14px; border-radius: var(--radius);
+            font-family: inherit; font-size: 15px; font-weight: 800;
+            cursor: pointer; transition: all 0.15s;
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+        }
+        .finalize-btn:active { transform: scale(0.97); }
+
+        /* ======================== BOTTOM SHEET ======================== */
+        .overlay {
+            position: fixed; inset: 0; background: rgba(15,23,42,0.6);
+            z-index: 200; opacity: 0; pointer-events: none;
+            transition: opacity 0.3s; backdrop-filter: blur(3px);
+        }
+        .overlay.open { opacity: 1; pointer-events: all; }
+
+        .bottom-sheet {
+            position: fixed; bottom: 0; left: 0; right: 0;
+            background: var(--card); border-radius: 22px 22px 0 0;
+            z-index: 201; max-height: 85svh;
+            display: flex; flex-direction: column;
+            transform: translateY(100%);
+            transition: transform 0.38s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            box-shadow: 0 -8px 40px rgba(0,0,0,0.2);
+        }
+        .bottom-sheet.open { transform: translateY(0); }
+
+        .sheet-handle {
+            width: 38px; height: 4px; background: #E2E8F0;
+            border-radius: 2px; margin: 12px auto 0; flex-shrink: 0;
+        }
+
+        .sheet-header {
+            padding: 14px 16px 12px;
+            border-bottom: 1px solid var(--border);
+            display: flex; justify-content: space-between;
+            align-items: flex-start; flex-shrink: 0;
+        }
+
+        .sheet-title-txt { font-size: 17px; font-weight: 800; }
+        .sheet-sub-txt { font-size: 12px; color: var(--slate); margin-top: 4px; }
+
+        .close-x {
+            width: 30px; height: 30px; border-radius: 50%;
+            background: var(--border); border: none; cursor: pointer;
+            font-size: 15px; display: flex; align-items: center;
+            justify-content: center; flex-shrink: 0;
+        }
+
+        .sheet-body { overflow-y: auto; -webkit-overflow-scrolling: touch; flex: 1; }
+
+        .guest-search-box {
+            padding: 10px 16px;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .guest-search-input {
+            width: 100%;
+            padding: 10px 14px;
+            border-radius: 9px;
+            border: 1.5px solid var(--border);
+            font-family: inherit;
+            font-size: 13px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        
+        .guest-search-input:focus { border-color: var(--amber); }
+
+        .guest-badge {
+            font-size: 10px;
+            background: #F3F4F6;
+            color: #6B7280;
+            padding: 2px 6px;
+            border-radius: 6px;
+            margin-right: 4px;
+            font-weight: 600;
+        }
+
+        .unassign-row {
+            margin: 10px 12px 0;
+            padding: 12px 16px; border-radius: 11px;
+            background: #FFF1F2; border: 1.5px solid #FECACA;
+            color: var(--red); cursor: pointer; text-align: center;
+            font-weight: 700; font-size: 14px; transition: opacity 0.12s;
+        }
+        .unassign-row:active { opacity: 0.7; }
+
+        .emp-list { padding: 8px 10px 12px; }
+
+        .emp-item {
+            display: flex; align-items: center; gap: 12px;
+            padding: 12px 12px; border-radius: 11px; margin-bottom: 3px;
+            cursor: pointer; transition: background 0.12s;
+        }
+        .emp-item:active { background: var(--amber-pale); }
+        .emp-item.is-current { background: #ECFDF5; }
+
+        .emp-avatar {
+            width: 42px; height: 42px; border-radius: 50%;
+            background: linear-gradient(135deg, var(--amber), var(--amber-dark));
+            color: white; display: flex; align-items: center;
+            justify-content: center; font-weight: 800; font-size: 16px;
+            flex-shrink: 0;
+        }
+
+        .emp-info { flex: 1; min-width: 0; }
+        .emp-item-name { font-size: 15px; font-weight: 700; }
+        .emp-item-count { font-size: 12px; color: var(--slate); margin-top: 3px; }
+
+        .emp-arrow { color: var(--amber); font-size: 20px; flex-shrink: 0; }
+
+        /* ======================== LOADING ======================== */
+        .loading-state {
+            display: flex; justify-content: center; align-items: center;
+            padding: 60px 20px; flex-direction: column; gap: 14px;
+            color: var(--slate);
+        }
+
+        .spinner {
+            width: 34px; height: 34px;
+            border: 3px solid var(--border);
+            border-top-color: var(--amber);
+            border-radius: 50%;
+            animation: spin 0.75s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .empty-state {
+            text-align: center; padding: 50px 20px;
+            color: var(--slate); font-size: 15px;
+        }
+        .empty-state .empty-icon { font-size: 48px; margin-bottom: 12px; }
+
+        /* ======================== TOAST ======================== */
+        .toast {
+            position: fixed; bottom: 24px; left: 50%;
+            transform: translateX(-50%) translateY(80px);
+            background: var(--navy); color: white;
+            padding: 12px 22px; border-radius: 24px;
+            font-size: 14px; font-weight: 600;
+            z-index: 999; transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+            white-space: nowrap; box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            pointer-events: none;
+        }
+        .toast.show { transform: translateX(-50%) translateY(0); }
+        .toast.ok { border-bottom: 3px solid var(--green); }
+        .toast.err { border-bottom: 3px solid var(--red); }
+
+        /* ======================== PRINT ======================== */
+        @media print {
+            @page {
+                size: landscape;
+                margin: 6mm 10mm;
+            }
+            
+            body {
+                background: white !important;
+                color: #000000 !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                font-size: 11px;
+            }
+
+            /* Hide interactive UI elements */
+            .header, 
+            .view-toggle-wrap, 
+            .export-wrap,
+            .finalize-wrap,
+            .assign-pill, 
+            .add-chip, 
+            .overlay, 
+            .bottom-sheet,
+            .deadline-bar, 
+            .section-wrap { 
+                display: none !important; 
+            }
+
+            /* Ensure container doesn't truncate horizontally or vertically */
+            .table-wrap {
+                padding: 0 !important;
+                margin: 0 !important;
+                overflow: visible !important;
+                max-height: none !important;
+                width: 100% !important;
+                display: block !important;
+            }
+
+            /* Force table to fit print boundaries and break gracefully */
+            .sched-table {
+                width: 100% !important;
+                min-width: 100% !important;
+                table-layout: fixed !important;
+                box-shadow: none !important;
+                border: 1px solid #94A3B8 !important;
+                page-break-inside: avoid;
+            }
+
+            .sched-table th, 
+            .sched-table td {
+                padding: 6px 4px !important;
+                font-size: 10px !important;
+                border: 1px solid #CBD5E1 !important;
+                white-space: normal !important; /* Allow wrapping */
+                word-wrap: break-word !important;
+            }
+
+            /* Remove sticky positioning headers which cause overlays during print */
+            .day-th, .day-td {
+                position: static !important;
+                background: #F8FAFC !important;
+                border-left: 1px solid #CBD5E1 !important;
+            }
+        }
+        .unassigned-shift-card {
+    background-color: #FEE2E2 !important; /* Soft Red background */
+    border: 2px dashed #EF4444 !important; /* Red dashed border */
+    color: #991B1B !important;
+}
+
+.unassigned-badge {
+    background-color: #DC2626 !important;
+    color: #FFFFFF !important;
+    font-weight: 800 !important;
+    padding: 3px 8px !important;
+    border-radius: 4px !important;
+    font-size: 0.75rem !important;
+    display: inline-block !important;
+}
+
+        .hidden { display: none !important; }
+
+        /* Mobile refinements */
+        @media (max-width: 390px) {
+            .shift-title-txt { font-size: 13px; }
+            .assign-pill { padding: 6px 11px; font-size: 12px; }
+            .staff-name-txt { font-size: 13px; }
+            .shift-bar-bg { width: 70px; }
+        }
+        @media print {
+    body {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+    .unassigned-shift-card {
+        background-color: #FEE2E2 !important;
+        border: 2px dashed #DC2626 !important;
+    }
+    .unassigned-badge {
+        background-color: #DC2626 !important;
+        color: #FFFFFF !important;
+    }
+}
+
+.print-only {
+    display: none !important;
+}
+
+/* Print / PDF Export Styling */
+@media print {
+    body {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+    /* Hide interactive elements in PDF */
+    .print-hide {
+        display: none !important;
+    }
+    /* Show unassigned badge in PDF */
+    .print-only {
+        display: inline-block !important;
+    }
+    .unassigned-print-badge {
+        background-color: #FEE2E2 !important;
+        border: 1.5px dashed #EF4444 !important;
+        color: #991B1B !important;
+        font-weight: 800 !important;
+        padding: 3px 7px !important;
+        border-radius: 4px !important;
+        font-size: 10px !important;
+    }
+}
+    </style>
+</head>
+<body>
+
+<!-- ====================== HEADER ====================== -->
+<div class="header">
+    <div class="header-top">
+        <div class="header-brand">
+            <div class="brand-icon">📅</div>
+            <div class="brand-text">
+                <div class="brand-title">برنامه هفتگی</div>
+                <div class="brand-sub" id="branchSub">در حال بارگذاری…</div>
+            </div>
+        </div>
+        <div class="header-btns">
+            {% if view_type == 'admin' %}
+            <a href="/admin/calendar" class="h-btn" title="تقویم مدیر">🗓</a>
+            {% endif %}
+            <a href="/logout" class="h-btn" title="خروج">↩</a>
+        </div>
+    </div>
+
+    {% if view_type == 'admin' %}
+    <div class="branch-bar">
+        <select class="branch-select" id="branchSelect" onchange="onBranchChange()">
+            <option value="">— همه شعب —</option>
+            {% for b in all_branches %}
+            <option value="{{ b }}">{{ b }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    {% endif %}
+
+    <div class="week-nav">
+        <button class="nav-btn" onclick="changeWeek(-1)">◄ قبل</button>
+        <div class="week-label" id="weekLabel">…</div>
+        <button class="nav-btn" onclick="changeWeek(1)">بعد ►</button>
+    </div>
+</div>
+
+<!-- ====================== DEADLINE BAR ====================== -->
+<div class="deadline-bar hidden" id="deadlineBar">
+    <span id="deadlineIcon">⏰</span>
+    <span id="deadlineText">…</span>
+</div>
+
+<!-- ====================== VIEW TOGGLE ====================== -->
+<div class="view-toggle-wrap">
+    <div class="view-toggle">
+        <button class="v-btn active" id="vCard" onclick="setView('card')">📱 روزانه</button>
+        <button class="v-btn" id="vTable" onclick="setView('table')">📋 جدول</button>
+    </div>
+</div>
+
+<!-- ====================== MAIN CONTENT ====================== -->
+<div id="mainContent">
+    <div class="loading-state">
+        <div class="spinner"></div>
+        <div>در حال بارگذاری برنامه…</div>
+    </div>
+</div>
+
+<!-- ====================== EXPORT + STAFF ====================== -->
+<div id="bottomSection" class="hidden">
+    <div class="finalize-wrap" id="finalizeWrap" style="display:none;">
+        <button class="finalize-btn" id="finalizeBtn" onclick="finalizeWeek()">✅ تایید نهایی و ارسال برنامه</button>
+    </div>
+
+    <div class="export-wrap">
+        <button class="export-btn" onclick="exportPDF()">
+            <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path d="M12 17V3M12 17l-4-4M12 17l4-4M2 21h20"/>
+            </svg>
+            دریافت PDF جدول
+        </button>
+    </div>
+
+    <div class="section-wrap" style="margin-top:4px">
+        <div class="section-card">
+            <div class="section-head">
+                👥 <span>تعداد شیفت‌های این هفته</span>
+            </div>
+            <div id="staffListInner">
+                <div style="padding:20px;text-align:center;color:var(--slate)">در حال بارگذاری…</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ====================== ASSIGN SHEET ====================== -->
+<div class="overlay" id="overlay" onclick="closeSheet()"></div>
+<div class="bottom-sheet" id="bottomSheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+        <div>
+            <div class="sheet-title-txt">انتخاب کارمند</div>
+            <div class="sheet-sub-txt" id="sheetSub">—</div>
+        </div>
+        <button class="close-x" onclick="closeSheet()">✕</button>
+    </div>
+    <div class="sheet-body">
+        <div id="guestSearchSlot"></div>
+        <div id="unassignSlot"></div>
+        <div class="emp-list" id="empList"></div>
+    </div>
+</div>
+
+<!-- ====================== TOAST ====================== -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ===================== CONSTANTS =====================
+const IS_ADMIN = {{ 'true' if view_type == 'admin' else 'false' }};
+
+// ===================== STATE =====================
+let scheduleData = null;
+let currentView = 'card';
+let activeShiftId = null;
+let currentWeekStart = getThisSaturday();
+let guestSearchTimeout;
+
+
+
+
+// ===================== JALALI =====================
+function toJalali(gy, gm, gd) {
+    var g_d=[31,28,31,30,31,30,31,31,30,31,30,31];
+    var j_d=[31,31,31,31,31,31,30,30,30,30,30,29];
+    gy-=1600; gm-=1; gd-=1;
+    var g_dn=365*gy+Math.floor((gy+3)/4)-Math.floor((gy+99)/100)+Math.floor((gy+399)/400);
+    for(var i=0;i<gm;i++) g_dn+=g_d[i];
+    if(gm>1&&((gy+1600)%4==0&&((gy+1600)%100!=0||(gy+1600)%400==0))) g_dn++;
+    g_dn+=gd;
+    var j_dn=g_dn-79;
+    var j_np=Math.floor(j_dn/12053); j_dn%=12053;
+    var jy=979+33*j_np+4*Math.floor(j_dn/1461);
+    j_dn%=1461;
+    if(j_dn>=366){jy+=Math.floor((j_dn-1)/365); j_dn=(j_dn-1)%365;}
+    for(i=0;i<11&&j_dn>=j_d[i];i++) j_dn-=j_d[i];
+    return [jy, i+1, j_dn+1];
+}
+
+const J_MONTHS=['فروردین','اردیبهشت','خرداد','تیر','مرداد','شهریور','مهر','آبان','آذر','دی','بهمن','اسفند'];
+
+function isoToJalali(iso) {
+    const d=new Date(iso+'T12:00:00');
+    return toJalali(d.getFullYear(), d.getMonth()+1, d.getDate());
+}
+
+function jDisplay(iso, short=false) {
+    const [jy,jm,jd]=isoToJalali(iso);
+    return short ? `${jd} ${J_MONTHS[jm-1]}` : `${jd} ${J_MONTHS[jm-1]} ${jy}`;
+}
+
+// ===================== WEEK HELPERS =====================
+function getThisSaturday() {
+    const t=new Date(); t.setHours(0,0,0,0);
+    const day=t.getDay(); // 0=Sun,6=Sat
+    const diff=(day===6)?0:day+1;
+    t.setDate(t.getDate()-diff);
+    return t;
+}
+
+function isoDate(d) {
+    return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+
+function changeWeek(dir) {
+    const d=new Date(currentWeekStart);
+    d.setDate(d.getDate()+dir*7);
+    currentWeekStart=d;
+    fetchData();
+}
+
+function updateWeekLabel() {
+    const end=new Date(currentWeekStart);
+    end.setDate(end.getDate()+6);
+    const ws=isoDate(currentWeekStart), we=isoDate(end);
+    const [jy]=isoToJalali(ws);
+    document.getElementById('weekLabel').textContent=
+        `${jDisplay(ws,true)} تا ${jDisplay(we,true)} ${jy}`;
+}
+
+// ===================== BRANCH (admin) =====================
+function onBranchChange() {
+    currentWeekStart=getThisSaturday();
+    fetchData();
+}
+
+function getSelectedBranch() {
+    if(!IS_ADMIN) return '';
+    const sel=document.getElementById('branchSelect');
+    return sel ? sel.value : '';
+}
+
+// ===================== FETCH =====================
+async function fetchData() {
+    updateWeekLabel();
+    document.getElementById('mainContent').innerHTML=
+        '<div class="loading-state"><div class="spinner"></div><div>در حال بارگذاری…</div></div>';
+    document.getElementById('bottomSection').classList.add('hidden');
+
+    const branch=getSelectedBranch();
+    const url=`/api/weekly_schedule?week_start=${isoDate(currentWeekStart)}&branch=${encodeURIComponent(branch)}`;
+
+    try {
+        const r=await fetch(url);
+        if(!r.ok) {
+            const errData = await r.json().catch(() => ({}));
+            throw new Error(errData.error || `HTTP error ${r.status}`);
+        }
+        scheduleData=await r.json();
+
+        // نشان دادن وضعیت نهایی یا پیش‌نویس مستقیما در بالای صفحه
+        let branchName = scheduleData.branch || (IS_ADMIN ? 'همه شعب' : 'شعبه شما');
+        if (branchName && branchName !== 'همه شعب') {
+            branchName += scheduleData.is_locked ? ' (🔒 نهایی)' : ' (⚠️ پیش‌نویس)';
+        }
+        document.getElementById('branchSub').textContent = branchName;
+
+        renderDeadline();
+        renderAll();
+        
+        document.getElementById('bottomSection').classList.remove('hidden');
+        renderStaff();
+        updateFinalizeUI();
+        
+    } catch(e) {
+        document.getElementById('mainContent').innerHTML=
+            `<div class="loading-state" style="color:var(--red); font-weight: bold; font-size: 15px;">❌ ${e.message}</div>`;
+    }
+}
+
+// ===================== FINALIZE UI =====================
+function updateFinalizeUI() {
+    const fw = document.getElementById('finalizeWrap');
+    const fb = document.getElementById('finalizeBtn');
+    
+    if (!scheduleData) {
+        fw.style.display = 'none';
+        return;
+    }
+    
+    if (!IS_ADMIN) {
+        // نمای سرپرست
+        fw.style.display = 'block';
+        fb.style.border = 'none';
+        fb.style.color = 'white';
+        fb.style.opacity = '1';
+        
+        if (scheduleData.is_locked) {
+            fb.style.background = 'var(--slate)';
+            fb.style.boxShadow = 'none';
+            fb.textContent = '🔒 برنامه این هفته نهایی شده است';
+            fb.disabled = true;
+            fb.style.cursor = 'not-allowed';
+        } else {
+            fb.style.background = 'var(--green)';
+            fb.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.3)';
+            fb.textContent = '✅ تایید نهایی و ارسال برنامه';
+            fb.disabled = false;
+            fb.style.cursor = 'pointer';
+        }
+    } else {
+        // نمای مدیر سیستم
+        if (scheduleData.branch && scheduleData.branch !== 'همه شعب') {
+            fw.style.display = 'block';
+            fb.disabled = true; // دکمه برای مدیر غیرفعال است (صرفا جهت نمایش وضعیت)
+            fb.style.opacity = '1';
+            fb.style.cursor = 'default';
+            
+            if (scheduleData.is_locked) {
+                fb.style.background = '#ECFDF5';
+                fb.style.color = '#065F46';
+                fb.style.border = '1.5px solid #10B981';
+                fb.style.boxShadow = 'none';
+                fb.textContent = '🔒 برنامه این شعبه توسط سرپرست نهایی شده است';
+            } else {
+                fb.style.background = '#FFFBEB';
+                fb.style.color = '#92400E';
+                fb.style.border = '1.5px solid #F59E0B';
+                fb.style.boxShadow = 'none';
+                fb.textContent = '⚠️ پیش‌نویس (سرپرست هنوز تایید نهایی نکرده است)';
+            }
+        } else {
+            fw.style.display = 'none';
+        }
+    }
+}
+
+async function finalizeWeek() {
+    if(!confirm('آیا از نهایی کردن برنامه اطمینان دارید؟ پس از تایید، امکان ویرایش شیفت‌ها توسط شما وجود نخواهد داشت و شیفت‌های مهمان ثبت خواهند شد.')) return;
+    
+    try {
+        const r = await fetch('/api/schedule/finalize', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ 
+                week_start: scheduleData.week_start,
+                branch: scheduleData.branch
+            })
+        });
+        const data = await r.json();
+        if(r.ok && data.success) {
+            toast('برنامه با موفقیت نهایی شد', 'ok');
+            await fetchData();
+        } else {
+            toast(data.error || 'خطا در نهایی‌سازی', 'err');
+        }
+    } catch(e) {
+        toast('خطا در اتصال به سرور', 'err');
+    }
+}
+
+// ===================== DEADLINE =====================
+function deadlinePassed() {
+    if(IS_ADMIN) return false;
+    if(!scheduleData?.deadline) return false;
+    return Date.now()>new Date(scheduleData.deadline).getTime();
+}
+
+// ===================== RENDER DEADLINE =====================
+function renderDeadline() {
+    const bar=document.getElementById('deadlineBar');
+    const txt=document.getElementById('deadlineText');
+    const icon=document.getElementById('deadlineIcon');
+    if(!scheduleData?.deadline) { bar.classList.add('hidden'); return; }
+
+    const dl=new Date(scheduleData.deadline);
+    const now=Date.now();
+    const passed=now>dl.getTime();
+
+    bar.classList.remove('hidden','ok','passed','admin-pass');
+
+    if(passed && IS_ADMIN) {
+        bar.classList.add('admin-pass');
+        icon.textContent='🔓';
+        txt.textContent='مهلت پایان یافته — شما به عنوان مدیر می‌توانید ویرایش کنید';
+    } else if(passed) {
+        bar.classList.add('passed');
+        icon.textContent='🔒';
+        const [jy,jm,jd]=toJalali(dl.getFullYear(),dl.getMonth()+1,dl.getDate());
+        txt.textContent=`مهلت پایان یافت: ${jd} ${J_MONTHS[jm-1]} ${jy} ساعت ${String(dl.getHours()).padStart(2,'0')}:${String(dl.getMinutes()).padStart(2,'0')}`;
+    } else {
+        bar.classList.add('ok');
+        icon.textContent='⏰';
+        const diff=dl.getTime()-now;
+        const h=Math.floor(diff/3600000);
+        const d2=Math.floor(h/24);
+        const rem=d2>0?`${d2} روز و ${h%24} ساعت`:`${h} ساعت`;
+        const [jy,jm,jd]=toJalali(dl.getFullYear(),dl.getMonth()+1,dl.getDate());
+        txt.textContent=`مهلت: ${jd} ${J_MONTHS[jm-1]} ${jy} — ${rem} مانده`;
+    }
+}
+
+// ===================== VIEW TOGGLE =====================
+function setView(v) {
+    currentView=v;
+    document.getElementById('vCard').classList.toggle('active',v==='card');
+    document.getElementById('vTable').classList.toggle('active',v==='table');
+    if(scheduleData) renderAll();
+}
+
+function renderAll() {
+    currentView==='card' ? renderCards() : renderTable();
+}
+
+// ===================== CARD VIEW =====================
+function renderCards() {
+    if(!scheduleData?.days) return;
+    let html='<div class="card-view">';
+    let anyShift=false;
+
+    for(const day of scheduleData.days) {
+        if(day.shifts.length===0) continue;
+        anyShift=true;
+        const jd=jDisplay(day.date, true);
+        const cnt=day.shifts.length;
+        html+=`
+        <div class="day-card">
+          <div class="day-head">
+            <span class="day-name-big">${day.day_name}</span>
+            <span class="day-jalali">${jd}</span>
+            <span class="day-shift-count">${cnt} شیفت</span>
+          </div>`;
+
+        for(const sh of day.shifts) {
+            const canEdit = IS_ADMIN || (!deadlinePassed() && !scheduleData.is_locked);
+            const assigned = !!sh.assigned_employee_name;
+            html+=`
+          <div class="shift-row">
+            <div class="shift-left">
+              <div class="shift-title-txt">${sh.title}</div>
+              <div class="shift-time-txt">${sh.start} — ${sh.end}</div>
+              ${assigned
+                ? `<div class="shift-assigned-name">${esc(sh.assigned_employee_name)}</div>`
+                : `<div class="shift-empty">تخصیص نیافته</div>`}
+            </div>
+            ${canEdit
+              ? `<button class="assign-pill ${assigned?'assigned':''}"
+                    onclick="openSheet(${sh.id},'${esc2(sh.assigned_employee_name)}','${esc2(sh.title)} ${sh.start}–${sh.end}')">
+                    ${assigned?'تغییر':'انتخاب'}
+                 </button>`
+              : ''}
+          </div>`;
+        }
+        html+='</div>';
+    }
+
+    if(!anyShift) {
+        html+=`<div class="empty-state">
+            <div class="empty-icon">📋</div>
+            <div>هیچ شیفتی برای این هفته ثبت نشده</div>
+            <div style="font-size:13px;margin-top:6px;color:#94A3B8">
+              ${IS_ADMIN?'شیفت‌ها باید توسط مدیر تأیید شوند':'منتظر ثبت شیفت توسط مدیر باشید'}
+            </div>
+          </div>`;
+    }
+
+    html+='</div>';
+    document.getElementById('mainContent').innerHTML=html;
+}
+
+// ===================== TABLE VIEW =====================
+// ===================== TABLE VIEW =====================
+function renderTable() {
+    if(!scheduleData) return;
+    const {shift_columns:cols, days}=scheduleData;
+
+    if(!cols||cols.length===0) {
+        document.getElementById('mainContent').innerHTML=
+            `<div class="empty-state"><div class="empty-icon">📋</div><div>هیچ شیفتی برای این هفته ثبت نشده</div></div>`;
+        return;
+    }
+
+    const canEdit = IS_ADMIN || (!deadlinePassed() && !scheduleData.is_locked);
+    let html='<div class="table-wrap"><table class="sched-table"><thead><tr>';
+    html+=`<th class="day-th">روز</th>`;
+    for(const c of cols) {
+        html+=`<th><div>${c.title}</div></th>`;
+    }
+    html+='</tr></thead><tbody>';
+
+    for(const day of days) {
+        const colMap={};
+        for(const sh of day.shifts) {
+            if(!colMap[sh.col_key]) colMap[sh.col_key]=[];
+            colMap[sh.col_key].push(sh);
+        }
+
+        const jd=jDisplay(day.date,true);
+        html+=`<tr>
+          <td class="day-td">
+            <div class="day-td-name">${day.day_name}</div>
+            <div class="day-td-date">${jd}</div>
+          </td>`;
+
+        for(const c of cols) {
+            const shifts=colMap[c.key]||[];
+            html+='<td>';
+            if(shifts.length===0) {
+                html+='<span class="empty-cell">—</span>';
+            } else {
+                for(const sh of shifts) {
+                    const timeDiffers = (sh.start !== c.start || sh.end !== c.end);
+                    const timeColor = timeDiffers ? 'var(--amber-dark)' : 'var(--slate)';
+                    const timeWeight = timeDiffers ? '700' : '600';
+                    const timeTag = `<div style="font-size:10.5px;color:${timeColor};font-weight:${timeWeight};margin-top:4px;direction:ltr" ${timeDiffers ? 'title="زمان این شیفت با سرستون متفاوت است"' : ''}>${sh.start}–${sh.end}</div>`;
+
+                    if(sh.assigned_employee_name) {
+                        html+=`<div style="margin:6px 0;"><span class="emp-chip"
+                            ${canEdit?`onclick="openSheet(${sh.id},'${esc2(sh.assigned_employee_name)}','${esc2(sh.title)} ${sh.start}–${sh.end}')"`:''}>
+                            ✓ ${esc(sh.assigned_employee_name)}
+                          </span>${timeTag}</div>`;
+                    } else if(canEdit) {
+                        // On Screen: Shows '+ انتخاب' | In PDF: Shows '⚠️ بدون مسئول'
+                        html+=`<div style="margin:6px 0;">
+                            <span class="add-chip print-hide" onclick="openSheet(${sh.id},'','${esc2(sh.title)} ${sh.start}–${sh.end}')">+ انتخاب</span>
+                            <span class="unassigned-print-badge print-only">⚠️ بدون مسئول</span>
+                            ${timeTag}
+                        </div>`;
+                    } else {
+                        html+=`<div style="margin:6px 0;">
+                            <span class="empty-cell print-hide">—</span>
+                            <span class="unassigned-print-badge print-only">⚠️ بدون مسئول</span>
+                            ${timeTag}
+                        </div>`;
+                    }
+                }
+            }
+            html+='</td>';
+        }
+        html+='</tr>';
+    }
+
+    html+='</tbody></table></div>';
+    document.getElementById('mainContent').innerHTML=html;
+}
+// ===================== STAFF LIST =====================
+function renderStaff() {
+    const emps=scheduleData?.employees||[];
+    const max=Math.max(...emps.map(e=>e.shift_count),1);
+    let html='';
+
+    if(emps.length===0) {
+        html='<div style="padding:20px;text-align:center;color:var(--slate);font-size:14px">کارمندی در این شعبه ثبت نشده</div>';
+    } else {
+        const sorted=[...emps].sort((a,b)=>b.shift_count-a.shift_count);
+        sorted.forEach((e,i)=>{
+            const pct=Math.round((e.shift_count/max)*100);
+            const cls=i===0?'r1':i===1?'r2':'rn';
+            html+=`
+            <div class="staff-item">
+              <div class="rank-badge ${cls}">${i+1}</div>
+              <div class="staff-name-txt">${esc(e.name)}</div>
+              <div class="bar-wrap">
+                <div class="shift-bar-bg">
+                  <div class="shift-bar-fill" style="width:${pct}%"></div>
+                </div>
+                <div class="shift-count-num">${e.shift_count}</div>
+              </div>
+            </div>`;
+        });
+    }
+
+    document.getElementById('staffListInner').innerHTML=html;
+}
+
+// ===================== ASSIGN SHEET =====================
+function openSheet(shiftId, currentEmpName, shiftLabel) {
+    if(!IS_ADMIN && scheduleData?.is_locked) {
+        toast('برنامه نهایی شده و قابل ویرایش نیست', 'err'); return;
+    }
+    if(!IS_ADMIN && deadlinePassed()) {
+        toast('مهلت ثبت شیفت پایان یافته', 'err'); return;
+    }
+    
+    activeShiftId=shiftId;
+    document.getElementById('sheetSub').textContent=shiftLabel;
+
+    document.getElementById('guestSearchSlot').innerHTML = `
+        <div class="guest-search-box">
+            <input type="text" class="guest-search-input" placeholder="🔍 جستجوی مهمان از سایر شعب..." oninput="searchGuest(this.value, ${shiftId})" />
+        </div>
+        <div id="guestResults" class="emp-list" style="padding-top:0;"></div>
+    `;
+
+    document.getElementById('unassignSlot').innerHTML=currentEmpName
+        ? `<div class="unassign-row" onclick="doAssign(${shiftId},'','')">❌ حذف تخصیص (${esc(currentEmpName)})</div>`
+        : '';
+
+    const emps=scheduleData?.employees||[];
+    const sorted=[...emps].sort((a,b)=>a.shift_count-b.shift_count);
+    let html='';
+    if(sorted.length===0) {
+        html='<div style="padding:24px;text-align:center;color:var(--slate)">هیچ کارمندی در این شعبه یافت نشد</div>';
+    } else {
+        html += `<div style="padding: 12px 16px 0; font-size: 13px; font-weight: 700; color: var(--slate);">پرسنل شعبه</div>`;
+        for(const e of sorted) {
+            const isCurrent=e.name===currentEmpName;
+            html+=`
+            <div class="emp-item ${isCurrent?'is-current':''}"
+                 onclick="doAssign(${shiftId},'${esc2(e.id)}','${esc2(e.name)}')">
+              <div class="emp-avatar">${e.name.charAt(0)}</div>
+              <div class="emp-info">
+                <div class="emp-item-name">${esc(e.name)}${isCurrent?' ✓':''}</div>
+                <div class="emp-item-count">${e.shift_count} شیفت این هفته</div>
+              </div>
+              <div class="emp-arrow">›</div>
+            </div>`;
+        }
+    }
+    document.getElementById('empList').innerHTML=html;
+
+    document.getElementById('overlay').classList.add('open');
+    document.getElementById('bottomSheet').classList.add('open');
+}
+
+function closeSheet() {
+    document.getElementById('overlay').classList.remove('open');
+    document.getElementById('bottomSheet').classList.remove('open');
+}
+
+function searchGuest(query, shiftId) {
+    const resDiv = document.getElementById('guestResults');
+    if(query.trim().length < 2) {
+        resDiv.innerHTML = '';
+        return;
+    }
+    clearTimeout(guestSearchTimeout);
+    guestSearchTimeout = setTimeout(async () => {
+        resDiv.innerHTML = '<div style="text-align:center; padding:10px; color:var(--slate); font-size:13px;">در حال جستجو...</div>';
+        try {
+            const r = await fetch(`/api/baristas/search?q=${encodeURIComponent(query)}`);
+            const data = await r.json();
+            if(data.length === 0) {
+                resDiv.innerHTML = '<div style="text-align:center; padding:10px; color:var(--slate); font-size:13px;">نتیجه‌ای یافت نشد</div>';
+                return;
+            }
+            let html = '';
+            for(const e of data) {
+                const isGuest = e.home_branch !== scheduleData.branch;
+                const badgeHtml = isGuest ? `<span class="guest-badge">مهمان از ${esc(e.home_branch)}</span>` : `<span class="guest-badge" style="background:#ECFDF5; color:#065F46;">${esc(e.home_branch)}</span>`;
+                html += `
+                <div class="emp-item" style="background:var(--amber-pale)" onclick="doAssign(${shiftId},'${esc2(e.id)}','${esc2(e.name)}')">
+                  <div class="emp-avatar" style="background:var(--slate)">${e.name.charAt(0)}</div>
+                  <div class="emp-info">
+                    <div class="emp-item-name">${esc(e.name)}</div>
+                    <div style="margin-top:4px;">${badgeHtml}</div>
+                  </div>
+                  <div class="emp-arrow">›</div>
+                </div>`;
+            }
+            resDiv.innerHTML = html;
+        } catch (err) {
+            resDiv.innerHTML = '<div style="text-align:center; padding:10px; color:var(--red); font-size:13px;">خطا در جستجو</div>';
+        }
+    }, 400);
+}
+
+async function doAssign(shiftId, empId, empName) {
+    closeSheet();
+    const endpoint=IS_ADMIN
+        ? `/api/shifts/${shiftId}/admin_assign`
+        : `/api/shifts/${shiftId}/assign`;
+
+    try {
+        const r=await fetch(endpoint, {
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({emp_id:empId, emp_name:empName})
+        });
+        const data=await r.json();
+        if(r.ok && data.success) {
+            toast(empName?`${empName} ✓ تخصیص یافت`:'تخصیص حذف شد','ok');
+            await fetchData();
+        } else {
+            toast(data.error||'خطا در ثبت تغییرات','err');
+        }
+    } catch {
+        toast('خطا در اتصال به سرور','err');
+    }
+}
+
+// ===================== EXPORT =====================
+function exportPDF() {
+    const prev=currentView;
+    setView('table');
+    setTimeout(()=>{
+        window.print();
+        setTimeout(()=>setView(prev),500);
+    },300);
+}
+
+// ===================== TOAST =====================
+function toast(msg, type='') {
+    const t=document.getElementById('toast');
+    t.textContent=msg;
+    t.className=`toast ${type}`;
+    t.classList.add('show');
+    setTimeout(()=>t.classList.remove('show'),3200);
+}
+
+// ===================== ESCAPE HELPERS =====================
+function esc(s) {
+    return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function esc2(s) {
+    return String(s||'')
+        .replace(/\\/g, '\\\\')
+        .replace(/'/g, "\\'")
+        .replace(/"/g, '&quot;')
+        .replace(/\r?\n/g, '\\n');
+}
+
+// ===================== INIT =====================
+fetchData();
+</script>
+</body>
+</html>

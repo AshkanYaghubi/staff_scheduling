@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<body>
+    <h2>Review Pending Schedule</h2>
+    <a href="{{ url_for('admin_dashboard') }}">Back to Dashboard</a>
+    <hr>
+    {% if schedules %}
+        <table border="1">
+            <tr>
+                <th>Branch</th>
+                <th>Date</th>
+                <th>Hour</th>
+                <th>Required Baristas (Man-hours)</th>
+            </tr>
+            {% for s in schedules %}
+            <tr>
+                <td>{{ s.branch_name }}</td>
+                <td>{{ s.target_date }}</td>
+                <td>{{ s.target_hour }}:00</td>
+                <td>{{ s.required_baristas }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+        <br>
+        <form method="POST">
+            <button type="submit">Approve & Save Schedule</button>
+        </form>
+    {% else %}
+        <p>No pending schedules. Generate one first.</p>
+    {% endif %}
+</body>
+</html>
