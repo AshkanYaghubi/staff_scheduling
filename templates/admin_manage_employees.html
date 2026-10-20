@@ -103,11 +103,21 @@
                         <td class="px-4 py-3 text-sm text-slate-800">{{ emp.employee_number }}</td>
                         <td class="px-4 py-3 text-sm text-slate-800">{{ emp.full_name }}</td>
                         <td class="px-4 py-3 text-sm">
-                            <span class="px-2 py-1 rounded-full text-xs font-medium {% if emp.role == 'supervisor' %}bg-purple-100 text-purple-800{% else %}bg-blue-100 text-blue-800{% endif %}">
-                                {{ emp.role|capitalize }}
-                            </span>
+                            <select data-emp="{{ emp.employee_number }}" class="access-role w-full px-2 py-1 border border-slate-300 rounded-md text-sm bg-white">
+                                <option value="barista" {% if emp.role == 'barista' %}selected{% endif %}>Barista</option>
+                                <option value="supervisor" {% if emp.role == 'supervisor' %}selected{% endif %}>Supervisor</option>
+                            </select>
                         </td>
-                        <td class="px-4 py-3 text-sm text-slate-800">{{ department_names.get(emp.department_id, 'N/A') }}</td>
+                        <td class="px-4 py-3 text-sm text-slate-800">
+                            <select data-emp="{{ emp.employee_number }}" class="access-branch w-full px-2 py-1 border border-slate-300 rounded-md text-sm bg-white">
+                                {% if not emp.department_id %}
+                                <option value="" selected>Select branch</option>
+                                {% endif %}
+                                {% for dept in all_departments %}
+                                <option value="{{ dept.id }}" {% if emp.department_id == dept.id %}selected{% endif %}>{{ dept.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </td>
                         <td class="px-4 py-3 text-center">
                             <button onclick="openResetPasswordModal('{{ emp.employee_number }}', '{{ emp.full_name }}')"
                                     class="text-blue-600 hover:text-blue-800 px-2 py-1 rounded text-sm font-medium transition">
@@ -276,6 +286,47 @@
         } 
     }
     
+    async function saveEmployeeAccess(employeeNumber, selectEl) {
+        const roleEl = document.querySelector(`.access-role[data-emp="${CSS.escape(employeeNumber)}"]`);
+        const branchEl = document.querySelector(`.access-branch[data-emp="${CSS.escape(employeeNumber)}"]`);
+        if (!roleEl || !branchEl || !branchEl.value) {
+            alert('Choose a branch before saving.');
+            return;
+        }
+        const row = selectEl.closest('tr');
+        roleEl.disabled = true;
+        branchEl.disabled = true;
+        try {
+            const response = await fetch(`/api/employees/${encodeURIComponent(employeeNumber)}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ role: roleEl.value, department_id: branchEl.value })
+            });
+            const data = await response.json();
+            if (!response.ok) {
+                alert(data.error || 'Could not update this employee.');
+                location.reload();
+                return;
+            }
+            if (row) {
+                row.style.transition = 'background-color 0.3s';
+                row.style.backgroundColor = '#D1FAE5';
+                setTimeout(() => { row.style.backgroundColor = ''; }, 1200);
+            }
+            if (data.password_updated) alert(data.message);
+        } catch (error) {
+            console.error(error);
+            alert('An error occurred while updating this employee.');
+        } finally {
+            roleEl.disabled = false;
+            branchEl.disabled = false;
+        }
+    }
+
+    document.querySelectorAll('.access-role, .access-branch').forEach((el) => {
+        el.addEventListener('change', () => saveEmployeeAccess(el.dataset.emp, el));
+    });
+
     // Debounced search for better UX
     let searchTimeout;
     const searchInput = document.querySelector('input[name="search"]');

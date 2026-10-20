@@ -724,6 +724,66 @@ def admin_manage_branches():
                          branch_supervisors=branch_supervisors,
                          user_role=current_user.role)
 
+def _job_title_for_role(job_title, role):
+    title = (job_title or '').strip()
+    if role == 'supervisor':
+        if 'سرپرست' not in title:
+            title = f'{title} سرپرست'.strip()
+    elif 'سرپرست' in title:
+        title = ' '.join(title.replace('سرپرست', ' ').split())
+        if not title:
+            title = 'باریستا'
+    return title[:100]
+
+
+@app.route('/api/employees/<string:employee_number>', methods=['PUT'])
+@login_required
+@role_required('admin')
+def api_update_auth_employee(employee_number):
+    auth_emp = AuthEmployee.query.filter_by(employee_number=employee_number).first_or_404()
+    data = request.json or {}
+    role = (data.get('role') or '').strip()
+    department_id = data.get('department_id')
+
+    if role not in ('barista', 'supervisor'):
+        return jsonify({'success': False, 'error': 'Role must be barista or supervisor.'}), 400
+    try:
+        department_id = int(department_id)
+    except (TypeError, ValueError):
+        return jsonify({'success': False, 'error': 'A branch is required.'}), 400
+
+    department = Department.query.get(department_id)
+    if not department:
+        return jsonify({'success': False, 'error': 'Branch not found.'}), 400
+
+    password_updated = False
+    auth_emp.role = role
+    auth_emp.department_id = department_id
+    if role == 'supervisor':
+        branch_pw = BranchSupervisorPassword.query.get(department_id)
+        if branch_pw:
+            auth_emp.password_hash = branch_pw.password_hash
+            auth_emp.password_text = branch_pw.password_text
+            password_updated = True
+
+    staged = ScheduleCoreEmployee.query.filter_by(employee_number=str(employee_number).strip()).first()
+    if staged:
+        staged.department_id = department_id
+        staged.job_title = _job_title_for_role(staged.job_title, role)
+
+    db.session.commit()
+    message = f'{auth_emp.full_name} updated.'
+    if password_updated:
+        message += ' The saved supervisor password for this branch was applied.'
+    return jsonify({
+        'success': True,
+        'message': message,
+        'role': role,
+        'department_id': department_id,
+        'department_name': department.name,
+        'password_updated': password_updated
+    })
+
 @app.route('/api/employees/<string:employee_number>/reset_password', methods=['PUT'])
 @login_required
 @role_required('admin')
