@@ -556,6 +556,7 @@
             .view-toggle-wrap, 
             .export-wrap,
             .finalize-wrap,
+            .print-note:empty,
             .assign-pill, 
             .add-chip, 
             .overlay, 
@@ -645,6 +646,25 @@
     display: none !important;
 }
 
+.print-note { display: none; }
+@media print {
+    .print-note:not(:empty) {
+        display: block !important;
+        margin: 0 0 8px;
+        padding: 6px 8px;
+        border: 1px solid #94A3B8;
+        font-size: 11px;
+        line-height: 1.7;
+        color: #000;
+        white-space: pre-wrap;
+        page-break-inside: avoid;
+    }
+    .print-note-label {
+        font-weight: 800;
+        margin-bottom: 2px;
+    }
+}
+
 /* Print / PDF Export Styling */
 @media print {
     body {
@@ -722,6 +742,8 @@
         <button class="v-btn" id="vTable" onclick="setView('table')">📋 جدول</button>
     </div>
 </div>
+
+<div class="print-note" id="printNote"></div>
 
 <!-- ====================== MAIN CONTENT ====================== -->
 <div id="mainContent">
@@ -910,6 +932,7 @@ async function fetchData() {
         document.getElementById('bottomSection').classList.remove('hidden');
         renderStaff();
         updateFinalizeUI();
+        syncPrintNote();
         
     } catch(e) {
         document.getElementById('mainContent').innerHTML=
@@ -922,6 +945,22 @@ function onSupervisorNoteInput() {
     const note = document.getElementById('supervisorNote');
     draftNote = note.value;
     draftNoteWeek = scheduleData ? scheduleData.week_start : '';
+    syncPrintNote();
+}
+
+function syncPrintNote() {
+    const el = document.getElementById('printNote');
+    if (!el) return;
+    const typed = document.getElementById('supervisorNote');
+    const text = ((typed && typed.value) || scheduleData?.supervisor_note || '').trim();
+    el.replaceChildren();
+    if (!text) return;
+    const label = document.createElement('div');
+    label.className = 'print-note-label';
+    label.textContent = 'توضیحات';
+    const body = document.createElement('div');
+    body.textContent = text;
+    el.append(label, body);
 }
 
 function showSavedNote(savedNote) {
@@ -1396,6 +1435,7 @@ async function doAssign(shiftId, empId, empName) {
 function exportPDF() {
     const prev=currentView;
     setView('table');
+    syncPrintNote();
     setTimeout(()=>{
         window.print();
         setTimeout(()=>setView(prev),500);
