@@ -364,6 +364,36 @@
             box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
         }
         .finalize-btn:active { transform: scale(0.97); }
+        .finalize-btn:disabled { cursor: not-allowed; box-shadow: none; }
+
+        .finalize-note-box { margin-bottom: 10px; }
+        .finalize-note-label {
+            display: block; font-size: 13px; font-weight: 800;
+            margin-bottom: 6px; color: var(--navy);
+        }
+        .finalize-note-label span { font-weight: 600; color: var(--slate); font-size: 12px; }
+        .finalize-note {
+            width: 100%; min-height: 88px; resize: vertical;
+            border: 1.5px solid var(--border); border-radius: 12px;
+            padding: 10px 12px; font-family: inherit; font-size: 14px;
+            line-height: 1.7; color: var(--navy); background: var(--card); outline: none;
+        }
+        .finalize-note:focus { border-color: var(--amber); }
+        .finalize-note[readonly] { background: #F8FAFC; color: var(--navy-mid); }
+
+        .finalize-warning {
+            background: var(--amber-pale); border: 1px solid #FDE68A; color: #92400E;
+            border-radius: 12px; padding: 10px 12px; font-size: 13px; font-weight: 600;
+            line-height: 1.8; margin-bottom: 10px;
+        }
+        .finalize-check {
+            display: flex; align-items: center; gap: 8px;
+            font-size: 14px; font-weight: 800; margin-bottom: 12px;
+            cursor: pointer; user-select: none;
+        }
+        .finalize-check input {
+            width: 18px; height: 18px; accent-color: var(--green); flex-shrink: 0;
+        }
 
         /* ======================== BOTTOM SHEET ======================== */
         .overlay {
@@ -704,6 +734,19 @@
 <!-- ====================== EXPORT + STAFF ====================== -->
 <div id="bottomSection" class="hidden">
     <div class="finalize-wrap" id="finalizeWrap" style="display:none;">
+        <div class="finalize-note-box" id="finalizeNoteBox">
+            <label class="finalize-note-label" for="supervisorNote">توضیحات <span>(اختیاری)</span></label>
+            <textarea id="supervisorNote" class="finalize-note" rows="3" maxlength="2000"
+                placeholder="هر توضیح یا اطلاعات اضافی درباره برنامه این هفته را بنویسید…"
+                oninput="onSupervisorNoteInput()"></textarea>
+        </div>
+        <div id="finalizeConfirm">
+            <p class="finalize-warning">پیش از نهایی کردن از صحت و درستی اطلاعات اطمینان حاصل نمایید. پس از نهایی کردن، امکان تغییر دادن وجود ندارد.</p>
+            <label class="finalize-check">
+                <input type="checkbox" id="finalizeAck" onchange="syncFinalizeButton()">
+                <span>از صحت و درستی اطلاعات مطمئنم.</span>
+            </label>
+        </div>
         <button class="finalize-btn" id="finalizeBtn" onclick="finalizeWeek()">✅ تایید نهایی و ارسال برنامه</button>
     </div>
 
@@ -759,6 +802,8 @@ let currentView = 'card';
 let activeShiftId = null;
 let currentWeekStart = getThisSaturday();
 let guestSearchTimeout;
+let draftNote = '';
+let draftNoteWeek = '';
 
 
 
@@ -873,42 +918,96 @@ async function fetchData() {
 }
 
 // ===================== FINALIZE UI =====================
+function onSupervisorNoteInput() {
+    const note = document.getElementById('supervisorNote');
+    draftNote = note.value;
+    draftNoteWeek = scheduleData ? scheduleData.week_start : '';
+}
+
+function showSavedNote(savedNote) {
+    const noteBox = document.getElementById('finalizeNoteBox');
+    const note = document.getElementById('supervisorNote');
+    if (savedNote) {
+        noteBox.style.display = 'block';
+        note.value = savedNote;
+        note.readOnly = true;
+    } else {
+        noteBox.style.display = 'none';
+        note.value = '';
+        note.readOnly = true;
+    }
+}
+
+function syncFinalizeButton() {
+    const fb = document.getElementById('finalizeBtn');
+    const ack = document.getElementById('finalizeAck');
+    if (!scheduleData || IS_ADMIN || scheduleData.is_locked) return;
+    const ok = ack.checked;
+    fb.disabled = !ok;
+    fb.style.opacity = ok ? '1' : '0.55';
+    fb.style.cursor = ok ? 'pointer' : 'not-allowed';
+}
+
 function updateFinalizeUI() {
     const fw = document.getElementById('finalizeWrap');
     const fb = document.getElementById('finalizeBtn');
+    const noteBox = document.getElementById('finalizeNoteBox');
+    const note = document.getElementById('supervisorNote');
+    const confirmBox = document.getElementById('finalizeConfirm');
+    const ack = document.getElementById('finalizeAck');
     
     if (!scheduleData) {
         fw.style.display = 'none';
         return;
     }
+
+    const savedNote = (scheduleData.supervisor_note || '').trim();
     
     if (!IS_ADMIN) {
         // نمای سرپرست
         fw.style.display = 'block';
         fb.style.border = 'none';
         fb.style.color = 'white';
-        fb.style.opacity = '1';
         
         if (scheduleData.is_locked) {
             fb.style.background = 'var(--slate)';
             fb.style.boxShadow = 'none';
+            fb.style.opacity = '1';
             fb.textContent = '🔒 برنامه این هفته نهایی شده است';
             fb.disabled = true;
             fb.style.cursor = 'not-allowed';
+            confirmBox.style.display = 'none';
+            ack.checked = false;
+            showSavedNote(savedNote);
+            draftNote = '';
+            draftNoteWeek = '';
         } else {
             fb.style.background = 'var(--green)';
             fb.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.3)';
             fb.textContent = '✅ تایید نهایی و ارسال برنامه';
-            fb.disabled = false;
-            fb.style.cursor = 'pointer';
+            noteBox.style.display = 'block';
+            note.readOnly = false;
+            if (draftNoteWeek === scheduleData.week_start) {
+                note.value = draftNote;
+            } else {
+                draftNote = '';
+                draftNoteWeek = scheduleData.week_start;
+                note.value = '';
+            }
+            confirmBox.style.display = 'block';
+            ack.checked = false;
+            syncFinalizeButton();
         }
     } else {
         // نمای مدیر سیستم
+        confirmBox.style.display = 'none';
+        ack.checked = false;
         if (scheduleData.branch && scheduleData.branch !== 'همه شعب') {
             fw.style.display = 'block';
             fb.disabled = true; // دکمه برای مدیر غیرفعال است (صرفا جهت نمایش وضعیت)
             fb.style.opacity = '1';
             fb.style.cursor = 'default';
+            showSavedNote(savedNote);
             
             if (scheduleData.is_locked) {
                 fb.style.background = '#ECFDF5';
@@ -930,7 +1029,15 @@ function updateFinalizeUI() {
 }
 
 async function finalizeWeek() {
+    if (!scheduleData || scheduleData.is_locked || IS_ADMIN) return;
+    const ack = document.getElementById('finalizeAck');
+    if (!ack.checked) {
+        toast('برای نهایی کردن، تأیید صحت اطلاعات لازم است', 'err');
+        return;
+    }
     if(!confirm('آیا از نهایی کردن برنامه اطمینان دارید؟ پس از تایید، امکان ویرایش شیفت‌ها توسط شما وجود نخواهد داشت و شیفت‌های مهمان ثبت خواهند شد.')) return;
+
+    const note = document.getElementById('supervisorNote').value.trim();
     
     try {
         const r = await fetch('/api/schedule/finalize', {
@@ -938,7 +1045,9 @@ async function finalizeWeek() {
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ 
                 week_start: scheduleData.week_start,
-                branch: scheduleData.branch
+                branch: scheduleData.branch,
+                note: note,
+                confirmed: true
             })
         });
         const data = await r.json();

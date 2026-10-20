@@ -253,6 +253,7 @@ class BranchWeekLock(db.Model):
     week_start_date = db.Column(db.Date)
     locked_at = db.Column(db.DateTime, default=datetime.utcnow)
     locked_by = db.Column(db.String(50))
+    supervisor_note = db.Column(db.Text)
 
 class ScheduleCoreEmployee(db.Model):
     __tablename__ = 'schedule_core_employees'
@@ -318,6 +319,7 @@ def ensure_schema_upgrades():
         CREATE INDEX IF NOT EXISTS idx_shift_templates_branch
             ON schedule.shift_templates (branch_name)
         """,
+        "ALTER TABLE schedule.branch_week_locks ADD COLUMN IF NOT EXISTS supervisor_note TEXT",
         "ALTER TABLE schedule.official_shifts ADD COLUMN IF NOT EXISTS category_id INTEGER",
         "ALTER TABLE schedule.deleted_official_shifts ADD COLUMN IF NOT EXISTS category_id INTEGER",
         """
@@ -960,8 +962,15 @@ def search_baristas():
 @login_required
 @role_required('supervisor')
 def api_finalize_schedule():
-    data = request.json
+    data = request.json or {}
     week_start_str = data.get('week_start')
+
+    if not data.get('confirmed'):
+        return jsonify({'error': 'برای نهایی کردن باید صحت اطلاعات را تأیید کنید.'}), 400
+
+    note = (data.get('note') or '').strip()
+    if len(note) > 2000:
+        return jsonify({'error': 'توضیحات نباید بیشتر از ۲۰۰۰ نویسه باشد.'}), 400
     
     try:
         week_start = datetime.strptime(week_start_str[:10], '%Y-%m-%d').date()
@@ -988,7 +997,8 @@ def api_finalize_schedule():
         new_lock = BranchWeekLock(
             branch_name=b_fa or b_en,
             week_start_date=week_start,
-            locked_by=current_user.username
+            locked_by=current_user.username,
+            supervisor_note=note or None
         )
         db.session.add(new_lock)
         
@@ -2591,6 +2601,7 @@ def api_weekly_schedule():
 
         # Check if week is locked
         is_locked = False
+        supervisor_note = ''
         if branch_display:
             b_en = branch_display
             b_fa = branch_display
@@ -2603,6 +2614,7 @@ def api_weekly_schedule():
             ).first()
             if lock:
                 is_locked = True
+                supervisor_note = (lock.supervisor_note or '').strip()
 
         # Group shifts by date and sort them chronologically
         shifts_by_day = {}
@@ -2757,7 +2769,8 @@ def api_weekly_schedule():
             'employees': employees,
             'deadline': deadline_info,
             'role': current_user.role,
-            'is_locked': is_locked
+            'is_locked': is_locked,
+            'supervisor_note': supervisor_note
         })
     except Exception as e:
         import traceback
@@ -2870,6 +2883,7 @@ def contact():
 def init_db():
     with app.app_context():
         db.create_all()
+        ensure_schema_upgrades()
         
         # Create default admin if not exists
         if not AppAdmin.query.filter_by(username='admin').first():
