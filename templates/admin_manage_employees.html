@@ -64,7 +64,7 @@
                         <option value="">All Branches</option>
                         {% for dept in all_departments %}
                             <option value="{{ dept.id }}" {% if current_department_filter|string == dept.id|string %}selected{% endif %}>
-                                {{ dept.name }}
+                                {{ department_display.get(dept.id, dept.name) }}
                             </option>
                         {% endfor %}
                     </select>
@@ -114,7 +114,7 @@
                                 <option value="" selected>Select branch</option>
                                 {% endif %}
                                 {% for dept in all_departments %}
-                                <option value="{{ dept.id }}" {% if emp.department_id == dept.id %}selected{% endif %}>{{ dept.name }}</option>
+                                <option value="{{ dept.id }}" {% if emp.department_id == dept.id %}selected{% endif %}>{{ department_display.get(dept.id, dept.name) }}</option>
                                 {% endfor %}
                             </select>
                         </td>

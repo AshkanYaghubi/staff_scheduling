@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, g
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from datetime import datetime, timedelta
@@ -7,6 +7,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from sqlalchemy import or_
 import math
 import os
+import unicodedata
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.postgresql import JSONB
 from datetime import time as dt_time
@@ -394,7 +395,14 @@ def inject_branches():
         return dict(all_branches=[current_user.branch_name] if current_user.branch_name else [])
     b1 = [b[0] for b in db.session.query(Schedule.branch_name).distinct().all() if b[0]]
     b2 = [b[0] for b in db.session.query(OfficialShift.branch_name).distinct().all() if b[0]]
-    return dict(all_branches=sorted(list(set(b1 + b2))))
+    seen = set()
+    canonical = []
+    for name in b1 + b2:
+        label = canonical_branch_name(name)
+        if label not in seen:
+            seen.add(label)
+            canonical.append(label)
+    return dict(all_branches=sorted(canonical))
 
 @app.route('/', methods=['GET', 'POST'])
 def login():
@@ -609,10 +617,23 @@ def admin_manage_employees():
     total_count = pagination.total
     department_names = {d.id: d.name for d in Department.query.all()}
     all_departments = Department.query.order_by(Department.name).all()
+    from collections import defaultdict
+    grouped_departments = defaultdict(list)
+    for dept in all_departments:
+        label = canonical_branch_name(dept.name) if dept.name else dept.name
+        grouped_departments[label].append(dept)
+    department_display = {}
+    for label, depts in grouped_departments.items():
+        if len(depts) == 1 and label:
+            department_display[depts[0].id] = label
+        else:
+            for dept in depts:
+                department_display[dept.id] = dept.name
     
     return render_template('admin_manage_employees.html', 
                          auth_employees=auth_employees, 
                          department_names=department_names,
+                         department_display=department_display,
                          all_departments=all_departments,
                          pagination=pagination,
                          total_count=total_count,
@@ -1041,15 +1062,13 @@ def api_finalize_schedule():
     branch = current_user.branch_name
     if not branch: return jsonify({'error': 'شعبه نامشخص'}), 400
     
-    b_en = branch
-    b_fa = branch
-    branch_info = Branch.query.filter(or_(Branch.branch_name == branch, Branch.branch_name_farsi == branch)).first()
-    if branch_info:
-        b_en = branch_info.branch_name
-        b_fa = branch_info.branch_name_farsi
+    lookup_names = _branch_lookup_names(branch)
+    branch_info = find_branch_record(branch)
+    b_en = branch_info.branch_name if branch_info and branch_info.branch_name else branch
+    b_fa = branch_info.branch_name_farsi if branch_info and branch_info.branch_name_farsi else branch
         
     existing_lock = BranchWeekLock.query.filter(
-        BranchWeekLock.branch_name.in_([b_en, b_fa]),
+        BranchWeekLock.branch_name.in_(lookup_names or [branch]),
         BranchWeekLock.week_start_date == week_start
     ).first()
     
@@ -1063,7 +1082,7 @@ def api_finalize_schedule():
         db.session.add(new_lock)
         
     shifts = OfficialShift.query.filter(
-        OfficialShift.branch_name.in_([b_en, b_fa]),
+        OfficialShift.branch_name.in_(lookup_names or [branch]),
         OfficialShift.start_time >= datetime.combine(week_start, datetime.min.time()),
         OfficialShift.start_time < datetime.combine(week_end + timedelta(days=1), datetime.min.time())
     ).all()
@@ -1073,7 +1092,7 @@ def api_finalize_schedule():
             emp = AuthEmployee.query.filter_by(employee_number=s.assigned_employee_id).first()
             if emp and emp.department_id:
                 dept = Department.query.get(emp.department_id)
-                if dept and dept.name not in [b_en, b_fa]:
+                if dept and dept.name not in set(lookup_names or [branch]):
                     existing = GuestShiftHistory.query.filter_by(shift_id=s.id).first()
                     if not existing:
                         guest_log = GuestShiftHistory(
@@ -1132,8 +1151,9 @@ def get_events():
     branch_english_name = branch
     branch_farsi_name = None
 
+    lookup_names = _branch_lookup_names(branch) if branch else []
     if branch:
-        branch_info = Branch.query.filter(or_(Branch.branch_name == branch, Branch.branch_name_farsi == branch)).first()
+        branch_info = find_branch_record(branch)
         if branch_info:
             branch_english_name = branch_info.branch_name
             branch_farsi_name = branch_info.branch_name_farsi
@@ -1141,9 +1161,7 @@ def get_events():
     # ================= ADMIN RECOMMENDATIONS =================
     if current_user.role == 'admin':
         if branch:
-            q_rec = Schedule.query.filter(
-                or_(Schedule.branch_name == branch_english_name, Schedule.branch_name == branch_farsi_name)
-            ) if branch_farsi_name else Schedule.query.filter_by(branch_name=branch_english_name)
+            q_rec = Schedule.query.filter(Schedule.branch_name.in_(lookup_names or [branch]))
         else:
             q_rec = Schedule.query
 
@@ -1269,12 +1287,7 @@ def get_events():
 
     # ================= SHIFT EVENTS =================
     if branch:
-        if branch_farsi_name and branch_english_name:
-            q_shift = OfficialShift.query.filter(
-                or_(OfficialShift.branch_name == branch_english_name, OfficialShift.branch_name == branch_farsi_name)
-            )
-        else:
-            q_shift = OfficialShift.query.filter_by(branch_name=branch)
+        q_shift = OfficialShift.query.filter(OfficialShift.branch_name.in_(lookup_names or [branch]))
     else:
         q_shift = OfficialShift.query
 
@@ -1324,7 +1337,7 @@ def get_events():
 @app.route('/api/branch_info/<branch_name>', methods=['GET', 'PUT'])
 @login_required
 def get_or_update_branch_info(branch_name):
-    branch = Branch.query.filter(or_(Branch.branch_name == branch_name, Branch.branch_name_farsi == branch_name)).first()
+    branch = find_branch_record(branch_name)
     if not branch: return jsonify({'error': 'Branch not found'}), 404
 
     if request.method == 'PUT':
@@ -1360,20 +1373,126 @@ def get_or_update_branch_info(branch_name):
 # SHIFT CATEGORIES
 # ==================================================================
 
+# Same real branch, different spellings. Space-only differences are matched
+# automatically. These pairs differ by more than spacing or a hyphen.
+MANUAL_BRANCH_GROUPS = [
+    ("پایدارفرد", "پایدار فرد"),
+    ("جردن عاطفی", "جردن عافطی-شرقی", "جردن عافطی شرقی"),
+]
+
+
+def normalize_branch_key(text):
+    """Ignore spacing, hyphens, and common Arabic/Persian letter variants."""
+    if not text:
+        return ""
+    t = str(text).strip().lower()
+    for src, dst in (
+        ("ي", "ی"), ("ى", "ی"), ("ك", "ک"), ("آ", "ا"), ("أ", "ا"),
+        ("إ", "ا"), ("ة", "ه"), ("ۀ", "ه"),
+    ):
+        t = t.replace(src, dst)
+    kept = []
+    for ch in t:
+        if unicodedata.category(ch) in ("Cf", "Zs") or ch in "-_./،,()ـ\u200c\u200b\u00a0":
+            continue
+        kept.append(ch)
+    t = "".join(kept)
+    for word in ("شعبه", "کافه", "فروشگاه"):
+        t = t.replace(word, "")
+    return t
+
+
+def _cached_branch_labels():
+    labels = getattr(g, "_branch_labels", None)
+    if labels is None:
+        labels = []
+        for branch in Branch.query.all():
+            labels.extend([branch.branch_name, branch.branch_name_farsi])
+        labels.extend(dept.name for dept in Department.query.all())
+        labels.extend(row[0] for row in db.session.query(Schedule.branch_name).distinct())
+        labels.extend(row[0] for row in db.session.query(OfficialShift.branch_name).distinct())
+        labels = [label for label in labels if label]
+        g._branch_labels = labels
+    return labels
+
+
+def _cached_branch_rows():
+    rows = getattr(g, "_branch_rows", None)
+    if rows is None:
+        rows = Branch.query.all()
+        g._branch_rows = rows
+    return rows
+
+
+def _manual_group_for(name):
+    key = normalize_branch_key(name)
+    for group in MANUAL_BRANCH_GROUPS:
+        if name in group or key in {normalize_branch_key(item) for item in group}:
+            return group
+    return None
+
+
 def _branch_lookup_names(branch_name):
-    """Return every alias (English/Farsi) a branch may be stored under."""
+    """Every stored spelling that refers to the same real branch."""
     if not branch_name:
         return []
-    names = {branch_name}
-    info = Branch.query.filter(
-        or_(Branch.branch_name == branch_name, Branch.branch_name_farsi == branch_name)
-    ).first()
-    if info:
-        if info.branch_name:
-            names.add(info.branch_name)
-        if info.branch_name_farsi:
-            names.add(info.branch_name_farsi)
-    return list(names)
+    names = {str(branch_name).strip()}
+    labels = _cached_branch_labels()
+    changed = True
+    while changed:
+        changed = False
+        keys = {normalize_branch_key(name) for name in names}
+        keys.discard("")
+        for name in list(names):
+            group = _manual_group_for(name)
+            if not group:
+                continue
+            for item in group:
+                if item not in names:
+                    names.add(item)
+                    changed = True
+        for label in labels:
+            if label in names:
+                continue
+            if normalize_branch_key(label) in keys:
+                names.add(label)
+                changed = True
+    return [name for name in names if name]
+
+
+def find_branch_record(name):
+    if not name:
+        return None
+    names = set(_branch_lookup_names(name))
+    keys = {normalize_branch_key(item) for item in names}
+    for branch in _cached_branch_rows():
+        for label in (branch.branch_name, branch.branch_name_farsi):
+            if label and (label in names or normalize_branch_key(label) in keys):
+                return branch
+    return None
+
+
+def canonical_branch_name(name):
+    if not name:
+        return name
+    names = set(_branch_lookup_names(name))
+    keys = {normalize_branch_key(item) for item in names}
+    for branch in _cached_branch_rows():
+        for label in (branch.branch_name_farsi, branch.branch_name):
+            if label and (label in names or normalize_branch_key(label) in keys):
+                return branch.branch_name_farsi or branch.branch_name
+    for group in MANUAL_BRANCH_GROUPS:
+        group_keys = {normalize_branch_key(item) for item in group}
+        if names.intersection(group) or keys.intersection(group_keys):
+            for item in group:
+                for label in names:
+                    if normalize_branch_key(label) == normalize_branch_key(item):
+                        return label
+            return group[0]
+    same = [label for label in names if normalize_branch_key(label) == normalize_branch_key(name)]
+    if same:
+        return sorted(same, key=lambda label: (-len(label), label))[0]
+    return name
 
 
 def _serialize_shift(s):
@@ -1905,11 +2024,7 @@ def api_approve_all():
     branch_req = request.json.get('branch')
     q = OfficialShift.query.filter_by(status='draft')
     if branch_req:
-        branch_info = Branch.query.filter(or_(Branch.branch_name == branch_req, Branch.branch_name_farsi == branch_req)).first()
-        if branch_info and branch_info.branch_name_farsi:
-            q = q.filter(or_(OfficialShift.branch_name == branch_info.branch_name, OfficialShift.branch_name == branch_info.branch_name_farsi))
-        else:
-            q = q.filter_by(branch_name=branch_req)
+        q = q.filter(OfficialShift.branch_name.in_(_branch_lookup_names(branch_req) or [branch_req]))
     shifts = q.all()
     for s in shifts:
         s.status = 'approved'
@@ -1928,15 +2043,14 @@ def api_auto_generate_shifts():
     if not branch_name or not start_date_str or not end_date_str:
         return jsonify({'error': 'Missing parameters'}), 400
 
-    branch = Branch.query.filter(or_(Branch.branch_name == branch_name, Branch.branch_name_farsi == branch_name)).first()
+    branch = find_branch_record(branch_name)
     if not branch or not branch.morning_shift_start or not branch.evening_shift_end:
         return jsonify({'error': 'Please configure Morning and Evening shift times for this branch first.'}), 400
 
     start_dt = datetime.strptime(start_date_str, '%Y-%m-%d').date()
     end_dt = datetime.strptime(end_date_str, '%Y-%m-%d').date()
 
-    lookup_names = [branch.branch_name]
-    if branch.branch_name_farsi: lookup_names.append(branch.branch_name_farsi)
+    lookup_names = _branch_lookup_names(branch_name) or [branch.branch_name]
 
     schedules = Schedule.query.filter(
         Schedule.branch_name.in_(lookup_names),
@@ -2016,12 +2130,7 @@ def api_copy_week_shifts():
     from_monday = datetime.strptime(from_str, '%Y-%m-%d').date()
     to_monday   = datetime.strptime(to_str,   '%Y-%m-%d').date()
 
-    branch = Branch.query.filter(or_(Branch.branch_name == branch_name, Branch.branch_name_farsi == branch_name)).first()
-    lookup_names = [branch_name]
-    if branch:
-        if branch.branch_name:       lookup_names.append(branch.branch_name)
-        if branch.branch_name_farsi: lookup_names.append(branch.branch_name_farsi)
-    lookup_names = list(set(lookup_names))
+    lookup_names = _branch_lookup_names(branch_name) or [branch_name]
 
     from_start = datetime.combine(from_monday, datetime.min.time())
     from_end   = datetime.combine(from_monday + timedelta(days=7), datetime.min.time())
@@ -2077,15 +2186,9 @@ def api_assign_shift(id):
         }), 403
 
     # 2. Branch Access Check
-    user_branch_en = current_user.branch_name
-    user_branch_fa = current_user.branch_name
-    if current_user.branch_name:
-        branch_info = Branch.query.filter(or_(Branch.branch_name == current_user.branch_name, Branch.branch_name_farsi == current_user.branch_name)).first()
-        if branch_info:
-            user_branch_en = branch_info.branch_name
-            user_branch_fa = branch_info.branch_name_farsi
+    allowed_names = set(_branch_lookup_names(current_user.branch_name) or [current_user.branch_name])
 
-    if shift.branch_name not in [user_branch_en, user_branch_fa]:
+    if shift.branch_name not in allowed_names:
         return jsonify({'error': 'Permission denied'}), 403
 
     # 3. Week Lock Check
@@ -2094,7 +2197,7 @@ def api_assign_shift(id):
     week_end = week_start + timedelta(days=6)
     
     lock = BranchWeekLock.query.filter(
-        BranchWeekLock.branch_name.in_([user_branch_en, user_branch_fa]),
+        BranchWeekLock.branch_name.in_(list(allowed_names)),
         BranchWeekLock.week_start_date == week_start
     ).first()
     
@@ -2638,18 +2741,13 @@ def api_weekly_schedule():
         branch_display = None
         branch_info_obj = None
         if branch:
-            branch_info_obj = Branch.query.filter(
-                or_(Branch.branch_name == branch, Branch.branch_name_farsi == branch)
-            ).first()
+            lookup_names = _branch_lookup_names(branch)
+            branch_info_obj = find_branch_record(branch)
             if branch_info_obj:
                 branch_display = branch_info_obj.branch_name_farsi or branch_info_obj.branch_name
-                q = q.filter(or_(
-                    OfficialShift.branch_name == branch_info_obj.branch_name,
-                    OfficialShift.branch_name == branch_info_obj.branch_name_farsi
-                ))
             else:
-                q = q.filter(OfficialShift.branch_name == branch)
-                branch_display = branch
+                branch_display = canonical_branch_name(branch)
+            q = q.filter(OfficialShift.branch_name.in_(lookup_names or [branch]))
         else:
             branch_display = "همه شعب"
 
@@ -2662,14 +2760,9 @@ def api_weekly_schedule():
         # Check if week is locked
         is_locked = False
         supervisor_note = ''
-        if branch_display:
-            b_en = branch_display
-            b_fa = branch_display
-            if branch_info_obj:
-                b_en = branch_info_obj.branch_name
-                b_fa = branch_info_obj.branch_name_farsi
+        if branch:
             lock = BranchWeekLock.query.filter(
-                BranchWeekLock.branch_name.in_([b_en, b_fa]),
+                BranchWeekLock.branch_name.in_(lookup_names or [branch]),
                 BranchWeekLock.week_start_date == week_start
             ).first()
             if lock:
@@ -2788,9 +2881,7 @@ def api_weekly_schedule():
             if not dept_id:
                 return jsonify({'error': 'هیچ دپارتمانی برای حساب کاربری شما تعریف نشده است. لطفا با مدیر سیستم تماس بگیرید.'}), 400
         elif current_user.role == 'admin' and branch:
-            b_en = branch_info_obj.branch_name if branch_info_obj else branch
-            b_fa = branch_info_obj.branch_name_farsi if branch_info_obj else None
-            names_to_check = [b_en] + ([b_fa] if b_fa else [])
+            names_to_check = _branch_lookup_names(branch) or [branch]
             dept = Department.query.filter(Department.name.in_(names_to_check)).first()
             if dept:
                 dept_id = dept.id
