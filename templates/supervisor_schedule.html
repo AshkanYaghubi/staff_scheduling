@@ -720,6 +720,14 @@
             {% endfor %}
         </select>
     </div>
+    {% elif supervisor_branches|default([])|length > 1 %}
+    <div class="branch-bar">
+        <select class="branch-select" id="branchSelect" onchange="onBranchChange()">
+            {% for b in supervisor_branches %}
+            <option value="{{ b.name }}">{{ b.label }}</option>
+            {% endfor %}
+        </select>
+    </div>
     {% endif %}
 
     <div class="week-nav">
@@ -891,12 +899,11 @@ function updateWeekLabel() {
 
 // ===================== BRANCH (admin) =====================
 function onBranchChange() {
-    currentWeekStart=getThisSaturday();
+    if (IS_ADMIN) currentWeekStart=getThisSaturday();
     fetchData();
 }
 
 function getSelectedBranch() {
-    if(!IS_ADMIN) return '';
     const sel=document.getElementById('branchSelect');
     return sel ? sel.value : '';
 }

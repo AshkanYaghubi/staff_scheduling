@@ -117,6 +117,16 @@
                                 <option value="{{ dept.id }}" {% if emp.department_id == dept.id %}selected{% endif %}>{{ department_display.get(dept.id, dept.name) }}</option>
                                 {% endfor %}
                             </select>
+                            <div class="access-extra-wrap mt-2" data-emp="{{ emp.employee_number }}" {% if emp.role != 'supervisor' %}style="display:none"{% endif %}>
+                                <div class="text-xs font-semibold text-slate-500 mb-1">شعبه‌های دیگر — Ctrl را نگه دارید</div>
+                                <select multiple data-emp="{{ emp.employee_number }}" class="access-extra w-full px-2 py-1 border border-slate-300 rounded-md text-sm bg-white h-24">
+                                    {% for dept in all_departments %}
+                                    {% if dept.id != emp.department_id %}
+                                    <option value="{{ dept.id }}" {% if dept.id in extra_branches.get(emp.employee_number, []) %}selected{% endif %}>{{ department_display.get(dept.id, dept.name) }}</option>
+                                    {% endif %}
+                                    {% endfor %}
+                                </select>
+                            </div>
                         </td>
                         <td class="px-4 py-3 text-center">
                             <button onclick="openResetPasswordModal('{{ emp.employee_number }}', '{{ emp.full_name }}')"
@@ -293,14 +303,25 @@
             alert('Choose a branch before saving.');
             return;
         }
+        const extraWrap = document.querySelector(`.access-extra-wrap[data-emp="${CSS.escape(employeeNumber)}"]`);
+        const extraEl = document.querySelector(`.access-extra[data-emp="${CSS.escape(employeeNumber)}"]`);
+        if (extraWrap) extraWrap.style.display = roleEl.value === 'supervisor' ? 'block' : 'none';
+        const extraIds = (extraEl && roleEl.value === 'supervisor')
+            ? Array.from(extraEl.selectedOptions).map((option) => option.value).filter((value) => value && value !== branchEl.value)
+            : [];
         const row = selectEl.closest('tr');
         roleEl.disabled = true;
         branchEl.disabled = true;
+        if (extraEl) extraEl.disabled = true;
         try {
             const response = await fetch(`/api/employees/${encodeURIComponent(employeeNumber)}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ role: roleEl.value, department_id: branchEl.value })
+                body: JSON.stringify({
+                    role: roleEl.value,
+                    department_id: branchEl.value,
+                    extra_department_ids: extraIds
+                })
             });
             const data = await response.json();
             if (!response.ok) {
@@ -320,10 +341,11 @@
         } finally {
             roleEl.disabled = false;
             branchEl.disabled = false;
+            if (extraEl) extraEl.disabled = false;
         }
     }
 
-    document.querySelectorAll('.access-role, .access-branch').forEach((el) => {
+    document.querySelectorAll('.access-role, .access-branch, .access-extra').forEach((el) => {
         el.addEventListener('change', () => saveEmployeeAccess(el.dataset.emp, el));
     });
 

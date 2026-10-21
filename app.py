@@ -107,6 +107,17 @@ class BranchSupervisorPassword(db.Model):
     password_text = db.Column(db.String(255), nullable=False)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+class SupervisorExtraBranch(db.Model):
+    """Additional branches one supervisor can schedule, besides their home branch."""
+    __tablename__ = 'supervisor_extra_branches'
+    __table_args__ = (
+        db.UniqueConstraint('employee_number', 'department_id', name='uq_supervisor_extra_branch'),
+        {'schema': 'schedule'},
+    )
+    id = db.Column(db.Integer, primary_key=True)
+    employee_number = db.Column(db.String(50), nullable=False)
+    department_id = db.Column(db.Integer, nullable=False)
+
 class Schedule(db.Model):
     __tablename__ = 'schedules'
     __table_args__ = {'schema': 'schedule'}
@@ -319,6 +330,14 @@ def ensure_schema_upgrades():
         """
         CREATE INDEX IF NOT EXISTS idx_shift_templates_branch
             ON schedule.shift_templates (branch_name)
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS schedule.supervisor_extra_branches (
+            id SERIAL PRIMARY KEY,
+            employee_number VARCHAR(50) NOT NULL,
+            department_id INTEGER NOT NULL,
+            UNIQUE (employee_number, department_id)
+        )
         """,
         "ALTER TABLE schedule.branch_week_locks ADD COLUMN IF NOT EXISTS supervisor_note TEXT",
         "ALTER TABLE schedule.official_shifts ADD COLUMN IF NOT EXISTS category_id INTEGER",
@@ -542,6 +561,12 @@ def admin_manage_employees():
                 if role == 'supervisor' and saved_branch_pw:
                     user.password_hash = saved_branch_pw.password_hash
                     user.password_text = saved_branch_pw.password_text
+                if role != 'supervisor':
+                    SupervisorExtraBranch.query.filter_by(employee_number=emp_num).delete()
+                else:
+                    SupervisorExtraBranch.query.filter_by(
+                        employee_number=emp_num, department_id=staged.department_id
+                    ).delete()
 
                 updated_accounts += 1
             else:
@@ -609,7 +634,18 @@ def admin_manage_employees():
     if role_filter:
         query = query.filter(AuthEmployee.role == role_filter)
     if department_filter and department_filter.isdigit():
-        query = query.filter(AuthEmployee.department_id == int(department_filter))
+        dept_id = int(department_filter)
+        extra_numbers = [
+            row.employee_number
+            for row in SupervisorExtraBranch.query.filter_by(department_id=dept_id).all()
+        ]
+        if extra_numbers:
+            query = query.filter(or_(
+                AuthEmployee.department_id == dept_id,
+                AuthEmployee.employee_number.in_(extra_numbers),
+            ))
+        else:
+            query = query.filter(AuthEmployee.department_id == dept_id)
         
     query = query.order_by(AuthEmployee.employee_number)
     pagination = query.paginate(page=page, per_page=50, error_out=False)
@@ -629,11 +665,15 @@ def admin_manage_employees():
         else:
             for dept in depts:
                 department_display[dept.id] = dept.name
+    extra_branches = {}
+    for row in SupervisorExtraBranch.query.all():
+        extra_branches.setdefault(row.employee_number, []).append(row.department_id)
     
     return render_template('admin_manage_employees.html', 
                          auth_employees=auth_employees, 
                          department_names=department_names,
                          department_display=department_display,
+                         extra_branches=extra_branches,
                          all_departments=all_departments,
                          pagination=pagination,
                          total_count=total_count,
@@ -688,6 +728,9 @@ def admin_manage_branches():
             
     for s in auth_sups:
         add_sup(s.department_id, s.full_name)
+    sup_names = {s.employee_number: s.full_name for s in auth_sups}
+    for extra in SupervisorExtraBranch.query.all():
+        add_sup(extra.department_id, sup_names.get(extra.employee_number))
     for s in core_sups:
         add_sup(s.department_id, s.full_name)
 
@@ -745,6 +788,55 @@ def admin_manage_branches():
                          branch_supervisors=branch_supervisors,
                          user_role=current_user.role)
 
+def supervisor_department_ids(employee_number, primary_department_id=None):
+    ids = []
+    if primary_department_id:
+        ids.append(primary_department_id)
+    if not employee_number:
+        return ids
+    for row in SupervisorExtraBranch.query.filter_by(employee_number=str(employee_number).strip()).all():
+        if row.department_id and row.department_id not in ids:
+            ids.append(row.department_id)
+    return ids
+
+
+def supervisor_branch_options(user):
+    ids = supervisor_department_ids(getattr(user, 'username', None), getattr(user, 'department_id', None))
+    if not ids:
+        return []
+    depts = {dept.id: dept for dept in Department.query.filter(Department.id.in_(ids)).all()}
+    options = []
+    for dept_id in ids:
+        dept = depts.get(dept_id)
+        if dept and dept.name:
+            options.append({
+                'id': dept.id,
+                'name': dept.name,
+                'label': canonical_branch_name(dept.name),
+            })
+    return options
+
+
+def supervisor_allowed_branch_names(user):
+    names = set()
+    for option in supervisor_branch_options(user):
+        names.add(option['name'])
+        names.update(_branch_lookup_names(option['name']))
+    if not names and getattr(user, 'branch_name', None):
+        names.add(user.branch_name)
+        names.update(_branch_lookup_names(user.branch_name))
+    return names
+
+
+def supervisor_can_access_branch_name(user, branch_name):
+    if not branch_name:
+        return False
+    allowed = supervisor_allowed_branch_names(user)
+    if branch_name in allowed:
+        return True
+    return bool(set(_branch_lookup_names(branch_name)) & allowed)
+
+
 def _job_title_for_role(job_title, role):
     title = (job_title or '').strip()
     if role == 'supervisor':
@@ -777,15 +869,34 @@ def api_update_auth_employee(employee_number):
     if not department:
         return jsonify({'success': False, 'error': 'Branch not found.'}), 400
 
+    primary_changed = auth_emp.role != role or auth_emp.department_id != department_id
     password_updated = False
     auth_emp.role = role
     auth_emp.department_id = department_id
-    if role == 'supervisor':
+    if role == 'supervisor' and primary_changed:
         branch_pw = BranchSupervisorPassword.query.get(department_id)
         if branch_pw:
             auth_emp.password_hash = branch_pw.password_hash
             auth_emp.password_text = branch_pw.password_text
             password_updated = True
+
+    SupervisorExtraBranch.query.filter_by(employee_number=auth_emp.employee_number).delete()
+    if role == 'supervisor':
+        seen_extra = set()
+        for raw_id in data.get('extra_department_ids') or []:
+            try:
+                extra_id = int(raw_id)
+            except (TypeError, ValueError):
+                continue
+            if extra_id == department_id or extra_id in seen_extra:
+                continue
+            if not Department.query.get(extra_id):
+                continue
+            seen_extra.add(extra_id)
+            db.session.add(SupervisorExtraBranch(
+                employee_number=auth_emp.employee_number,
+                department_id=extra_id,
+            ))
 
     staged = ScheduleCoreEmployee.query.filter_by(employee_number=str(employee_number).strip()).first()
     if staged:
@@ -923,6 +1034,7 @@ def api_update_schedule_employee_department(id):
 @role_required('admin')
 def api_delete_auth_employee(employee_number):
     auth_emp = AuthEmployee.query.filter_by(employee_number=employee_number).first_or_404()
+    SupervisorExtraBranch.query.filter_by(employee_number=auth_emp.employee_number).delete()
     db.session.delete(auth_emp)
     db.session.commit()
     return jsonify({'success': True})
@@ -936,7 +1048,11 @@ def admin_calendar(): return render_template('calendar.html', view_type='admin')
 @login_required
 @role_required('supervisor')
 def supervisor_dashboard():
-    return render_template('supervisor_schedule.html', view_type='supervisor')
+    return render_template(
+        'supervisor_schedule.html',
+        view_type='supervisor',
+        supervisor_branches=supervisor_branch_options(current_user),
+    )
 
 @app.route('/admin/schedule')
 @login_required
@@ -1059,7 +1175,11 @@ def api_finalize_schedule():
         return jsonify({'error': 'تاریخ نامعتبر'}), 400
         
     week_end = week_start + timedelta(days=6)
-    branch = current_user.branch_name
+    requested_branch = (data.get('branch') or '').strip()
+    if requested_branch and supervisor_can_access_branch_name(current_user, requested_branch):
+        branch = requested_branch
+    else:
+        branch = current_user.branch_name
     if not branch: return jsonify({'error': 'شعبه نامشخص'}), 400
     
     lookup_names = _branch_lookup_names(branch)
@@ -1143,7 +1263,11 @@ def get_events():
     end_date = datetime.fromisoformat(end_str[:10]).date() if end_str else None
 
     if current_user.role == 'supervisor':
-        branch = current_user.branch_name
+        requested_branch = (request.args.get('branch') or '').strip()
+        if requested_branch and supervisor_can_access_branch_name(current_user, requested_branch):
+            branch = requested_branch
+        else:
+            branch = current_user.branch_name
         if not branch: return jsonify([])
 
     events = []
@@ -2186,7 +2310,7 @@ def api_assign_shift(id):
         }), 403
 
     # 2. Branch Access Check
-    allowed_names = set(_branch_lookup_names(current_user.branch_name) or [current_user.branch_name])
+    allowed_names = supervisor_allowed_branch_names(current_user)
 
     if shift.branch_name not in allowed_names:
         return jsonify({'error': 'Permission denied'}), 403
@@ -2195,9 +2319,11 @@ def api_assign_shift(id):
     days_back = (shift_date.weekday() - 5) % 7
     week_start = shift_date - timedelta(days=days_back)
     week_end = week_start + timedelta(days=6)
+    shift_branch_names = set(_branch_lookup_names(shift.branch_name) or [shift.branch_name])
+    shift_branch_names.add(shift.branch_name)
     
     lock = BranchWeekLock.query.filter(
-        BranchWeekLock.branch_name.in_(list(allowed_names)),
+        BranchWeekLock.branch_name.in_(list(shift_branch_names)),
         BranchWeekLock.week_start_date == week_start
     ).first()
     
@@ -2623,7 +2749,11 @@ def api_apply_friday_pattern():
     week_start_str = data.get('week_start')
 
     if current_user.role == 'supervisor':
-        branch_name = current_user.branch_name
+        requested_branch = (data.get('branch') or '').strip()
+        if requested_branch and supervisor_can_access_branch_name(current_user, requested_branch):
+            branch_name = requested_branch
+        else:
+            branch_name = current_user.branch_name
         if not branch_name:
             return jsonify({'error': 'شعبه کاربر مشخص نیست'}), 400
 
@@ -2711,7 +2841,10 @@ def api_weekly_schedule():
 
         # Determine branch based on role
         if current_user.role == 'supervisor':
-            branch = current_user.branch_name
+            if branch_param and supervisor_can_access_branch_name(current_user, branch_param):
+                branch = branch_param
+            else:
+                branch = current_user.branch_name
             if not branch:
                 return jsonify({'error': 'هیچ شعبه‌ای برای حساب کاربری شما تعریف نشده است. لطفا با مدیر سیستم تماس بگیرید.'}), 400
         else:
@@ -2877,7 +3010,13 @@ def api_weekly_schedule():
         employees = []
         dept_id = None
         if current_user.role == 'supervisor':
-            dept_id = current_user.department_id
+            allowed_ids = supervisor_department_ids(current_user.username, current_user.department_id)
+            names = _branch_lookup_names(branch) if branch else []
+            matched = Department.query.filter(Department.name.in_(names)).first() if names else None
+            if matched and matched.id in allowed_ids:
+                dept_id = matched.id
+            else:
+                dept_id = current_user.department_id
             if not dept_id:
                 return jsonify({'error': 'هیچ دپارتمانی برای حساب کاربری شما تعریف نشده است. لطفا با مدیر سیستم تماس بگیرید.'}), 400
         elif current_user.role == 'admin' and branch:
