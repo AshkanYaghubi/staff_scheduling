@@ -28,6 +28,50 @@
             </div>
         </div>
 
+        <div class="border-t pt-8 mt-8">
+            <h3 class="text-xl font-bold text-slate-800 mb-2">Add from core employees</h3>
+            <p class="text-slate-500 text-sm mb-4">Search <span class="font-mono">core.v_employee_info</span>, then choose a role and branch. If the person is not in that list, create an account below.</p>
+            <div class="relative mb-4">
+                <i class="fa-solid fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400"></i>
+                <input type="text" id="coreSearch" placeholder="Name, employee number, phone, or job title..."
+                       class="w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+            </div>
+            <div id="coreSearchStatus" class="text-sm text-slate-500 mb-3"></div>
+            <div id="coreSearchResults" class="space-y-3 mb-6"></div>
+
+            <button type="button" id="toggleCreateEmployee" class="bg-slate-800 text-white font-bold py-2 px-4 rounded-lg hover:bg-slate-700 transition">
+                <i class="fa-solid fa-user-plus mr-2"></i>Create someone not in the core list
+            </button>
+            <form id="createEmployeeForm" class="hidden mt-4 bg-slate-50 border border-slate-200 rounded-xl p-4 grid md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Employee number</label>
+                    <input id="newEmpNumber" class="w-full px-3 py-2 border border-slate-300 rounded-lg" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Full name</label>
+                    <input id="newEmpName" class="w-full px-3 py-2 border border-slate-300 rounded-lg" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Mobile phone</label>
+                    <input id="newEmpPhone" class="w-full px-3 py-2 border border-slate-300 rounded-lg" placeholder="Used as the first password when present">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Role</label>
+                    <select id="newEmpRole" class="w-full px-3 py-2 border border-slate-300 rounded-lg">
+                        <option value="barista">Barista</option>
+                        <option value="supervisor">Supervisor</option>
+                    </select>
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Branch</label>
+                    <select id="newEmpBranch" class="w-full px-3 py-2 border border-slate-300 rounded-lg"></select>
+                </div>
+                <div class="md:col-span-2">
+                    <button type="submit" class="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition">Create account</button>
+                </div>
+            </form>
+        </div>
+
         <h3 class="text-xl font-bold text-slate-800 mb-4 border-t pt-8 mt-8">App Access Accounts</h3>
         
         {% with messages = get_flashed_messages(with_categories=true) %}
@@ -218,6 +262,146 @@
 </div>
 
 <script>
+    const BRANCH_OPTIONS = [
+        {% for dept in all_departments %}
+        {id: {{ dept.id }}, name: {{ department_display.get(dept.id, dept.name)|tojson }}},
+        {% endfor %}
+    ];
+
+    function branchSelectHtml(selectedId) {
+        const options = BRANCH_OPTIONS.map((dept) =>
+            `<option value="${dept.id}" ${String(dept.id) === String(selectedId) ? 'selected' : ''}>${escapeHtml(dept.name)}</option>`
+        ).join('');
+        return `<select class="core-branch w-full px-2 py-1 border border-slate-300 rounded-md text-sm bg-white">${options}</select>`;
+    }
+
+    function escapeHtml(value) {
+        return String(value || '').replace(/[&<>"']/g, (ch) => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        }[ch]));
+    }
+
+    function fillBranchSelect(select, selectedId) {
+        select.innerHTML = BRANCH_OPTIONS.map((dept) =>
+            `<option value="${dept.id}">${escapeHtml(dept.name)}</option>`
+        ).join('');
+        if (selectedId) select.value = String(selectedId);
+    }
+
+    async function addEmployeeAccount(payload, button) {
+        if (button) button.disabled = true;
+        try {
+            const response = await fetch('/api/employees/add', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            });
+            const data = await response.json();
+            if (!response.ok) {
+                alert(data.error || 'Could not add this employee.');
+                return;
+            }
+            location.reload();
+        } catch (error) {
+            console.error(error);
+            alert('Could not add this employee.');
+        } finally {
+            if (button) button.disabled = false;
+        }
+    }
+
+    function renderCoreResults(rows) {
+        const box = document.getElementById('coreSearchResults');
+        if (!rows.length) {
+            box.innerHTML = '';
+            return;
+        }
+        box.innerHTML = rows.map((row) => `
+            <div class="border border-slate-200 rounded-xl p-3 flex flex-wrap gap-3 items-end justify-between">
+                <div class="min-w-[220px]">
+                    <div class="font-semibold text-slate-800">${escapeHtml(row.full_name)}</div>
+                    <div class="text-sm text-slate-500">${escapeHtml(row.employee_number)} · ${escapeHtml(row.job_title || 'No job title')}</div>
+                    <div class="text-sm text-slate-500">${escapeHtml(row.department_name || 'No branch on the core record')}</div>
+                </div>
+                ${row.already_added ? '<span class="text-sm font-semibold text-green-700">Already in the access list</span>' : `
+                <div class="flex flex-wrap gap-2 items-end">
+                    <select class="core-role px-2 py-1 border border-slate-300 rounded-md text-sm bg-white">
+                        <option value="barista">Barista</option>
+                        <option value="supervisor">Supervisor</option>
+                    </select>
+                    ${branchSelectHtml(row.department_id)}
+                    <button type="button" class="core-add bg-blue-600 text-white text-sm font-bold px-3 py-1.5 rounded-lg hover:bg-blue-700"
+                        data-number="${escapeHtml(row.employee_number)}"
+                        data-name="${escapeHtml(row.full_name)}"
+                        data-phone="${escapeHtml(row.mobile_phone || '')}"
+                        data-job="${escapeHtml(row.job_title || '')}">Add</button>
+                </div>`}
+            </div>
+        `).join('');
+        box.querySelectorAll('.core-add').forEach((button) => {
+            button.addEventListener('click', () => {
+                const card = button.closest('div.border');
+                addEmployeeAccount({
+                    employee_number: button.dataset.number,
+                    full_name: button.dataset.name,
+                    mobile_phone: button.dataset.phone,
+                    job_title: button.dataset.job,
+                    role: card.querySelector('.core-role').value,
+                    department_id: card.querySelector('.core-branch').value
+                }, button);
+            });
+        });
+    }
+
+    let coreSearchTimer;
+    const coreSearch = document.getElementById('coreSearch');
+    coreSearch.addEventListener('input', () => {
+        clearTimeout(coreSearchTimer);
+        coreSearchTimer = setTimeout(async () => {
+            const term = coreSearch.value.trim();
+            const status = document.getElementById('coreSearchStatus');
+            if (term.length < 2) {
+                status.textContent = '';
+                document.getElementById('coreSearchResults').innerHTML = '';
+                return;
+            }
+            status.textContent = 'Searching the core list...';
+            try {
+                const response = await fetch('/api/core_employees/search?q=' + encodeURIComponent(term));
+                const data = await response.json();
+                if (!response.ok) {
+                    status.textContent = data.error || 'Search failed.';
+                    document.getElementById('coreSearchResults').innerHTML = '';
+                    return;
+                }
+                status.textContent = data.length ? `${data.length} people found` : 'No one in the core list matches. You can create an account below.';
+                renderCoreResults(data);
+            } catch (error) {
+                console.error(error);
+                status.textContent = 'Search failed.';
+            }
+        }, 350);
+    });
+
+    document.getElementById('toggleCreateEmployee').addEventListener('click', () => {
+        const form = document.getElementById('createEmployeeForm');
+        form.classList.toggle('hidden');
+        if (!form.classList.contains('hidden')) {
+            fillBranchSelect(document.getElementById('newEmpBranch'));
+        }
+    });
+
+    document.getElementById('createEmployeeForm').addEventListener('submit', (event) => {
+        event.preventDefault();
+        addEmployeeAccount({
+            employee_number: document.getElementById('newEmpNumber').value.trim(),
+            full_name: document.getElementById('newEmpName').value.trim(),
+            mobile_phone: document.getElementById('newEmpPhone').value.trim(),
+            role: document.getElementById('newEmpRole').value,
+            department_id: document.getElementById('newEmpBranch').value
+        }, event.submitter);
+    });
+
     function confirmSync() {
         return confirm('Warning: This will sync all non-manager employees from the editable data. Existing accounts will be updated. Continue?');
     }

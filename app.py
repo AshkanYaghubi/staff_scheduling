@@ -4,7 +4,7 @@ from flask_login import LoginManager, UserMixin, login_user, login_required, log
 from datetime import datetime, timedelta
 from functools import wraps
 from werkzeug.security import generate_password_hash, check_password_hash
-from sqlalchemy import or_
+from sqlalchemy import or_, text
 import math
 import os
 import unicodedata
@@ -98,6 +98,7 @@ class AuthEmployee(db.Model):
     full_name = db.Column(db.String(255), nullable=False)
     department_id = db.Column(db.Integer)
     password_text = db.Column(db.String(255))
+    manually_added = db.Column(db.Boolean, default=False)
 
 class BranchSupervisorPassword(db.Model):
     __tablename__ = 'branch_supervisor_passwords'
@@ -340,6 +341,7 @@ def ensure_schema_upgrades():
         )
         """,
         "ALTER TABLE schedule.branch_week_locks ADD COLUMN IF NOT EXISTS supervisor_note TEXT",
+        "ALTER TABLE schedule.auth_employees ADD COLUMN IF NOT EXISTS manually_added BOOLEAN DEFAULT FALSE",
         "ALTER TABLE schedule.official_shifts ADD COLUMN IF NOT EXISTS category_id INTEGER",
         "ALTER TABLE schedule.deleted_official_shifts ADD COLUMN IF NOT EXISTS category_id INTEGER",
         """
@@ -501,6 +503,219 @@ def admin_dashboard():
         return redirect(url_for('admin_calendar'))
     return render_template('admin_dashboard.html')
 
+def _core_employee_view_columns():
+    cached = getattr(g, '_core_employee_columns', None)
+    if cached is not None:
+        return cached
+    rows = db.session.execute(text(
+        "SELECT column_name FROM information_schema.columns "
+        "WHERE table_schema = 'core' AND table_name = 'v_employee_info'"
+    )).fetchall()
+    cached = {row[0].lower() for row in rows}
+    g._core_employee_columns = cached
+    return cached
+
+
+def _pick_column(columns, options):
+    for name in options:
+        if name in columns:
+            return name
+    return None
+
+
+def _core_employee_select():
+    columns = _core_employee_view_columns()
+    if not columns:
+        return None
+    number_col = _pick_column(columns, (
+        'employee_number', 'emp_number', 'personnel_code', 'employee_code', 'emp_code',
+    ))
+    name_col = _pick_column(columns, (
+        'full_name', 'employee_name', 'fullname', 'name',
+    ))
+    if not number_col or not name_col:
+        return None
+    mapping = {
+        'employee_number': number_col,
+        'full_name': name_col,
+        'department_id': _pick_column(columns, ('department_id', 'dept_id')),
+        'department_name': _pick_column(columns, ('department_name', 'dept_name', 'department')),
+        'job_title': _pick_column(columns, ('job_title', 'jobtitle', 'position', 'post_title')),
+        'mobile_phone': _pick_column(columns, ('mobile_phone', 'mobile', 'phone', 'cell_phone')),
+        'is_active': _pick_column(columns, ('is_active', 'active')),
+    }
+    return mapping
+
+
+def _quote_ident(name):
+    if not name or not name.replace('_', '').isalnum():
+        raise ValueError('Unexpected column name')
+    return '"' + name + '"'
+
+
+def search_core_employees(term, limit=20):
+    mapping = _core_employee_select()
+    if mapping is None:
+        return None
+    select_bits = []
+    for alias, column in mapping.items():
+        if column:
+            select_bits.append(f"v.{_quote_ident(column)} AS {alias}")
+        else:
+            select_bits.append(f"NULL AS {alias}")
+    where = []
+    params = {'q': f'%{term}%', 'limit': limit}
+    for alias in ('employee_number', 'full_name', 'job_title', 'mobile_phone', 'department_name'):
+        column = mapping.get(alias)
+        if column:
+            where.append(f"CAST(v.{_quote_ident(column)} AS TEXT) ILIKE :q")
+    if not where:
+        return []
+    sql = (
+        "SELECT " + ", ".join(select_bits) +
+        " FROM core.v_employee_info v WHERE " + " OR ".join(where) +
+        " ORDER BY v." + _quote_ident(mapping['full_name']) +
+        " LIMIT :limit"
+    )
+    rows = db.session.execute(text(sql), params).mappings().all()
+    numbers = [str(row['employee_number']).strip() for row in rows if row['employee_number']]
+    existing = set()
+    if numbers:
+        existing = {
+            emp.employee_number
+            for emp in AuthEmployee.query.filter(AuthEmployee.employee_number.in_(numbers)).all()
+        }
+    dept_ids = set()
+    for row in rows:
+        if row['department_id'] not in (None, ''):
+            try:
+                dept_ids.add(int(row['department_id']))
+            except (TypeError, ValueError):
+                pass
+    dept_names = {}
+    if dept_ids:
+        dept_names = {
+            dept.id: dept.name
+            for dept in Department.query.filter(Department.id.in_(dept_ids)).all()
+        }
+    results = []
+    for row in rows:
+        number = str(row['employee_number']).strip() if row['employee_number'] else ''
+        if not number:
+            continue
+        dept_id = None
+        if row['department_id'] not in (None, ''):
+            try:
+                dept_id = int(row['department_id'])
+            except (TypeError, ValueError):
+                dept_id = None
+        active = row['is_active']
+        results.append({
+            'employee_number': number,
+            'full_name': row['full_name'] or '',
+            'department_id': dept_id if dept_id in dept_names else None,
+            'department_name': dept_names.get(dept_id) or row['department_name'] or '',
+            'job_title': row['job_title'] or '',
+            'mobile_phone': row['mobile_phone'] or '',
+            'is_active': None if active is None else bool(active),
+            'already_added': number in existing,
+        })
+    return results
+
+
+def _account_password(role, department_id, mobile_phone):
+    if role == 'supervisor':
+        branch_pw = BranchSupervisorPassword.query.get(department_id)
+        if branch_pw:
+            return branch_pw.password_hash, branch_pw.password_text
+    raw_pw = str(mobile_phone).strip() if mobile_phone else 'Medici1230'
+    if len(raw_pw) < 4:
+        raw_pw = 'Medici1230'
+    pw_text = raw_pw if role == 'supervisor' else None
+    return generate_password_hash(raw_pw), pw_text
+
+
+def _upsert_manual_replica(employee_number, full_name, department_id, job_title, mobile_phone):
+    staged = ScheduleCoreEmployee.query.filter_by(employee_number=employee_number).first()
+    phone = (str(mobile_phone).strip()[:20] if mobile_phone else None) or None
+    if staged:
+        staged.full_name = full_name
+        staged.department_id = department_id
+        staged.job_title = job_title
+        staged.is_active = True
+        if phone:
+            staged.mobile_phone = phone
+        return
+    db.session.add(ScheduleCoreEmployee(
+        employee_number=employee_number,
+        full_name=full_name,
+        department_id=department_id,
+        job_title=job_title,
+        is_active=True,
+        mobile_phone=phone,
+    ))
+
+
+@app.route('/api/core_employees/search')
+@login_required
+@role_required('admin')
+def api_search_core_employees():
+    term = (request.args.get('q') or '').strip()
+    if len(term) < 2:
+        return jsonify([])
+    try:
+        results = search_core_employees(term)
+    except Exception as exc:
+        return jsonify({'error': f'جستجو در فهرست اصلی ممکن نیست: {exc}'}), 500
+    if results is None:
+        return jsonify({'error': 'نمای core.v_employee_info پیدا نشد یا ستون‌های نام و شماره را ندارد.'}), 404
+    return jsonify(results)
+
+
+@app.route('/api/employees/add', methods=['POST'])
+@login_required
+@role_required('admin')
+def api_add_auth_employee():
+    data = request.json or {}
+    employee_number = str(data.get('employee_number') or '').strip()
+    full_name = str(data.get('full_name') or '').strip()
+    role = str(data.get('role') or '').strip()
+    mobile_phone = str(data.get('mobile_phone') or '').strip()
+    job_title = str(data.get('job_title') or '').strip()
+    try:
+        department_id = int(data.get('department_id'))
+    except (TypeError, ValueError):
+        return jsonify({'success': False, 'error': 'یک شعبه انتخاب کنید.'}), 400
+
+    if not employee_number or not full_name:
+        return jsonify({'success': False, 'error': 'شماره و نام کارمند لازم است.'}), 400
+    if role not in ('barista', 'supervisor'):
+        return jsonify({'success': False, 'error': 'نقش باید باریستا یا سرپرست باشد.'}), 400
+    if not Department.query.get(department_id):
+        return jsonify({'success': False, 'error': 'شعبه پیدا نشد.'}), 400
+    if AuthEmployee.query.filter_by(employee_number=employee_number).first():
+        return jsonify({'success': False, 'error': 'این شماره از قبل در فهرست دسترسی وجود دارد.'}), 409
+
+    password_hash, password_text = _account_password(role, department_id, mobile_phone)
+    db.session.add(AuthEmployee(
+        employee_number=employee_number,
+        full_name=full_name,
+        password_hash=password_hash,
+        password_text=password_text,
+        role=role,
+        department_id=department_id,
+        manually_added=True,
+    ))
+    replica_title = job_title or _job_title_for_role('', role)
+    if role == 'supervisor' and 'سرپرست' not in replica_title:
+        replica_title = _job_title_for_role(replica_title, role)
+    elif role == 'barista':
+        replica_title = _job_title_for_role(replica_title, role)
+    _upsert_manual_replica(employee_number, full_name, department_id, replica_title, mobile_phone)
+    db.session.commit()
+    return jsonify({'success': True, 'message': f'{full_name} به فهرست دسترسی اضافه شد.'})
+
+
 @app.route('/admin/employees', methods=['GET', 'POST'])
 @login_required
 @role_required('admin')
@@ -553,6 +768,8 @@ def admin_manage_employees():
 
             if emp_num in existing_auth_map:
                 user = existing_auth_map[emp_num]
+                if user.manually_added:
+                    continue
                 user.full_name = staged.full_name
                 user.role = role
                 user.department_id = staged.department_id
@@ -601,6 +818,8 @@ def admin_manage_employees():
         
         fired_count = 0
         for emp in fired_employees:
+            if emp.manually_added:
+                continue
             if emp.department_id != 68:  # Department 68 = Fired / Inactive
                 emp.department_id = 68
                 fired_count += 1
@@ -938,6 +1157,25 @@ def admin_core_data_management():
     EXCLUDED_JOB_TITLES = ['مدیر']
     if request.method == 'POST':
         try:
+            manual_numbers = {
+                row.employee_number
+                for row in AuthEmployee.query.filter_by(manually_added=True).all()
+                if row.employee_number
+            }
+            preserved_manual = []
+            if manual_numbers:
+                for row in ScheduleCoreEmployee.query.filter(
+                    ScheduleCoreEmployee.employee_number.in_(manual_numbers)
+                ).all():
+                    preserved_manual.append({
+                        'employee_number': row.employee_number,
+                        'full_name': row.full_name,
+                        'department_id': row.department_id,
+                        'job_title': row.job_title,
+                        'is_active': row.is_active,
+                        'user_type': row.user_type,
+                        'mobile_phone': row.mobile_phone,
+                    })
             db.session.query(ScheduleCoreEmployee).delete()
             master_employees = CoreEmployee.query.filter_by(is_active=True).all()
             replica_objs = []
@@ -965,6 +1203,10 @@ def admin_core_data_management():
                 ))
             if replica_objs:
                 db.session.bulk_save_objects(replica_objs)
+            imported_numbers = {obj.employee_number for obj in replica_objs}
+            for item in preserved_manual:
+                if item['employee_number'] not in imported_numbers:
+                    db.session.add(ScheduleCoreEmployee(**item))
             db.session.commit()
             success_msg = f'Imported {len(replica_objs)} branch-only employees (non-managers).'
             if skipped_managers:
